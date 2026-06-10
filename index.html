@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World Cup 2026 — Prediction Pool</title>
+<style>
+  :root{
+    --bg:#0a0e1a; --panel:#121829; --panel-2:#1a2238; --line:#2a3553;
+    --ink:#f2f5ff; --muted:#8c97b8; --faint:#5d688a;
+    --accent:#00d9a3; --accent-2:#ffb547; --accent-ink:#04342c;
+    --home:#3a8bd4; --away:#e0794a; --draw:#aab4d4;
+    --green:#1d9e75; --red:#e24b4a; --gold:#ffd24a;
+    --rad:14px; --rad-sm:9px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    line-height:1.5; min-height:100vh;
+    background-image:radial-gradient(circle at 12% -10%, rgba(0,217,163,.08), transparent 40%),
+                     radial-gradient(circle at 92% 0%, rgba(255,181,71,.07), transparent 38%);
+  }
+  .wrap{max-width:940px;margin:0 auto;padding:26px 16px 90px}
+  header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:6px}
+  .brand{display:flex;align-items:center;gap:14px}
+  .crest{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,var(--accent),#0fae84);
+    display:grid;place-items:center;font-size:24px;flex-shrink:0}
+  h1{font-size:22px;font-weight:700;letter-spacing:-.02em;line-height:1.05}
+  .sub{color:var(--muted);font-size:13px;margin-top:2px}
+  .whoami{font-size:13px;color:var(--muted);text-align:right}
+  .whoami b{color:var(--accent)}
+  .countdown{display:flex;gap:8px;margin:18px 0 20px}
+  .cd{background:var(--panel);border:1px solid var(--line);border-radius:var(--rad-sm);padding:9px 0;text-align:center;flex:1}
+  .cd .n{font-size:21px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+  .cd .l{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:5px}
+  .tabs{display:flex;gap:5px;background:var(--panel);border:1px solid var(--line);border-radius:var(--rad);padding:5px;margin-bottom:20px;flex-wrap:wrap}
+  .tabs button{flex:1 1 120px;border:none;background:transparent;color:var(--muted);font-size:13.5px;font-weight:600;padding:11px 6px;border-radius:9px;cursor:pointer;transition:.15s;white-space:nowrap}
+  .tabs button.on{background:var(--panel-2);color:var(--ink);box-shadow:0 0 0 1px var(--line)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--rad);overflow:hidden;margin-bottom:18px}
+  .card.pad{padding:22px}
+  .grouphdr{display:flex;align-items:center;gap:10px;padding:14px 18px;background:var(--panel-2);border-bottom:1px solid var(--line)}
+  .grouphdr .gname{font-size:15px;font-weight:700}
+  .grouphdr .teams{font-size:12px;color:var(--muted);margin-left:auto}
+  .flag{display:inline-block;width:26px;height:18px;border-radius:3px;object-fit:cover;background:#243049;vertical-align:middle;box-shadow:0 0 0 1px rgba(255,255,255,.08)}
+  .flag.lg{width:34px;height:23px}
+  .flag.sm{width:20px;height:14px}
+  .match{padding:16px 18px;border-bottom:1px solid var(--line)}
+  .match:last-child{border-bottom:none}
+  .meta{font-size:11px;color:var(--faint);letter-spacing:.03em;margin-bottom:13px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .meta .dot{width:3px;height:3px;border-radius:50%;background:var(--faint)}
+  .scorer{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px}
+  .teamcol{display:flex;align-items:center;gap:9px;min-width:0}
+  .teamcol.away{flex-direction:row-reverse;text-align:right}
+  .teamcol .nm{font-size:13.5px;font-weight:600;line-height:1.15;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .stepper{display:flex;flex-direction:column;align-items:center;gap:5px;flex-shrink:0}
+  .stepper .val{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;width:46px;text-align:center}
+  .stepbtns{display:flex;gap:5px}
+  .stepbtns button{width:30px;height:28px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);border-radius:7px;font-size:16px;font-weight:700;cursor:pointer;line-height:1;transition:.1s}
+  .stepbtns button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+  .stepbtns button:active:not(:disabled){transform:scale(.92)}
+  .stepbtns button:disabled{opacity:.3;cursor:not-allowed}
+  .vs{font-size:13px;font-weight:700;color:var(--faint);padding:0 4px;align-self:center;margin-top:20px}
+  .pickstate{font-size:11px;text-align:center;margin-top:11px;color:var(--faint);min-height:15px}
+  .pickstate b{color:var(--accent)}
+  .pickstate.empty{color:var(--faint)}
+  .result-chip{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;margin-left:auto}
+  .result-chip.final{background:rgba(29,158,117,.16);color:var(--green)}
+  .pts-badge{font-weight:700;padding:2px 8px;border-radius:6px;font-size:11px;margin-left:6px}
+  .pts-5{background:rgba(255,210,74,.18);color:var(--gold)}
+  .pts-3{background:rgba(58,139,212,.2);color:#7ab6ec}
+  .pts-2{background:rgba(170,180,212,.16);color:var(--draw)}
+  .pts-0{background:rgba(226,75,74,.14);color:#f0908f}
+  input[type=text]{width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);font-size:16px;padding:13px 15px;border-radius:11px;outline:none;text-align:center}
+  input[type=text]:focus{border-color:var(--accent)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--accent);color:var(--accent-ink);border:none;font-size:15px;font-weight:700;padding:12px 22px;border-radius:11px;cursor:pointer;transition:.12s}
+  .btn:hover{filter:brightness(1.07)}
+  .btn:disabled{opacity:.4;cursor:not-allowed;filter:none}
+  .btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--line);font-weight:600}
+  .btn.ghost:hover{color:var(--ink)}
+  .btn.sm{padding:7px 13px;font-size:12.5px;border-radius:8px}
+  .btn.block{width:100%;margin-top:18px;padding:15px}
+  .btn.danger{background:transparent;border:1px solid rgba(226,75,74,.5);color:#f0908f}
+  .gate{max-width:430px;margin:30px auto;text-align:center}
+  .gate h2{font-size:19px;font-weight:700;margin-bottom:8px}
+  .gate p{color:var(--muted);font-size:14px;margin-bottom:20px}
+  .savebar{position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 32%);padding:18px 0 4px;margin-top:6px}
+  .savebar .row{background:var(--panel);border:1px solid var(--line);border-radius:var(--rad);padding:13px 18px;display:flex;align-items:center;gap:14px}
+  .savebar .prog{flex:1;font-size:13px;color:var(--muted)}
+  .savebar .prog b{color:var(--ink)}
+  .banner{display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:11px;font-size:13px;margin-bottom:18px;line-height:1.45}
+  .banner.lock{background:rgba(255,181,71,.12);border:1px solid rgba(255,181,71,.35);color:var(--accent-2)}
+  .banner.ok{background:rgba(29,158,117,.14);border:1px solid rgba(29,158,117,.4);color:var(--accent)}
+  .banner.info{background:rgba(58,139,212,.12);border:1px solid rgba(58,139,212,.35);color:#8cc0f0}
+  .banner.err{background:rgba(226,75,74,.12);border:1px solid rgba(226,75,74,.4);color:#f0908f}
+  table.lb{width:100%;border-collapse:collapse}
+  table.lb th{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);text-align:left;padding:12px 16px;border-bottom:1px solid var(--line);font-weight:600}
+  table.lb th.r,table.lb td.r{text-align:right}
+  table.lb td{padding:13px 16px;border-bottom:1px solid var(--line);font-size:14px}
+  table.lb tr:last-child td{border-bottom:none}
+  table.lb .rank{width:40px;font-weight:700;color:var(--muted)}
+  table.lb .rank.g1{color:var(--gold)} table.lb .rank.g2{color:#cdd3e3} table.lb .rank.g3{color:#d39b6a}
+  table.lb .who{font-weight:600}
+  table.lb .pts{font-weight:700;font-variant-numeric:tabular-nums}
+  table.lb .me{background:rgba(0,217,163,.06)}
+  .mini{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+  .scoring-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:6px}
+  .sc-card{background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:14px}
+  .sc-card .pn{font-size:26px;font-weight:700;line-height:1}
+  .sc-card .pn.gold{color:var(--gold)} .sc-card .pn.blue{color:#7ab6ec} .sc-card .pn.gray{color:var(--draw)}
+  .sc-card .pl{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.4}
+  .admin-match{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid var(--line)}
+  .admin-match:last-child{border-bottom:none}
+  .admin-score{display:flex;align-items:center;gap:6px;justify-content:center}
+  .admin-score input{width:42px;text-align:center;padding:8px 4px;font-size:17px;font-weight:700}
+  .empty{text-align:center;padding:50px 20px;color:var(--muted)}
+  .empty .big{font-size:34px;margin-bottom:12px}
+  .hint{font-size:12px;color:var(--faint);text-align:center;margin-top:14px;line-height:1.6}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(80px);background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:14px;padding:13px 24px;border-radius:12px;opacity:0;transition:.3s;z-index:50;pointer-events:none}
+  .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+  .loading{text-align:center;padding:60px;color:var(--muted)}
+  .setupwarn{max-width:560px;margin:40px auto;text-align:center;padding:26px;background:rgba(226,75,74,.08);border:1px solid rgba(226,75,74,.35);border-radius:14px}
+  .setupwarn h2{font-size:18px;color:#f0908f;margin-bottom:10px}
+  .setupwarn p{font-size:13.5px;color:var(--muted);line-height:1.6}
+  .setupwarn code{background:#1a2238;padding:2px 6px;border-radius:5px;color:var(--accent);font-size:12px}
+  @media(max-width:560px){
+    .teamcol .nm{font-size:12px}
+    .stepper .val{font-size:24px;width:38px}
+    .stepbtns button{width:26px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="crest">🏆</div>
+      <div>
+        <h1>World Cup 2026 — Prediction Pool</h1>
+        <div class="sub">Group stage · predict exact scores · 5 / 3 / 2 scoring</div>
+      </div>
+    </div>
+    <div class="whoami" id="whoami"></div>
+  </header>
+  <div class="countdown" id="countdown"></div>
+  <div id="app"><div class="loading">Connecting…</div></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+/* ============================================================
+   FIREBASE CONFIG  —  PASTE YOUR PROJECT KEYS HERE
+   (Firebase console → Project settings → Your apps → Web app → config)
+   ============================================================ */
+const firebaseConfig = {
+  apiKey: "AIzaSyAOnfCfUNmyV9gNrGLYCkmST-TyB2a73Lw",
+  authDomain: "wc-predictions-6df50.firebaseapp.com",
+  projectId: "wc-predictions-6df50",
+  storageBucket: "wc-predictions-6df50.firebasestorage.app",
+  messagingSenderId: "468394240427",
+  appId: "1:468394240427:web:5f3ff7e1aa57d0a9468aee"
+};
+const ADMIN_CODE = "wc2026admin";   // change before sharing; whoever has it can enter results
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, doc, setDoc, getDoc, collection, getDocs, onSnapshot }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+let db=null, FIREBASE_OK=false;
+try{
+  if(!firebaseConfig.apiKey.startsWith("PASTE")){
+    const fbApp=initializeApp(firebaseConfig);
+    db=getFirestore(fbApp);
+    FIREBASE_OK=true;
+  }
+}catch(e){ console.error("Firebase init failed",e); }
+
+/* ===== flags ===== */
+const CODE = {
+  "Mexico":"mx","South Africa":"za","South Korea":"kr","Czechia":"cz",
+  "Canada":"ca","Bosnia & Herzegovina":"ba","Qatar":"qa","Switzerland":"ch",
+  "Brazil":"br","Morocco":"ma","Haiti":"ht","Scotland":"gb-sct",
+  "United States":"us","Paraguay":"py","Australia":"au","Türkiye":"tr",
+  "Ivory Coast":"ci","Ecuador":"ec","Germany":"de","Curaçao":"cw",
+  "Netherlands":"nl","Japan":"jp","Sweden":"se","Tunisia":"tn",
+  "Iran":"ir","New Zealand":"nz","Belgium":"be","Egypt":"eg",
+  "Saudi Arabia":"sa","Uruguay":"uy","Spain":"es","Cape Verde":"cv",
+  "France":"fr","Senegal":"sn","Iraq":"iq","Norway":"no",
+  "Argentina":"ar","Algeria":"dz","Austria":"at","Jordan":"jo",
+  "Portugal":"pt","DR Congo":"cd","Uzbekistan":"uz","Colombia":"co",
+  "Ghana":"gh","Panama":"pa","England":"gb-eng","Croatia":"hr"
+};
+function flagURL(t){const c=CODE[t];return c?`https://flagcdn.com/w80/${c}.png`:"";}
+function flagImg(t,cls){
+  const u=flagURL(t),ab=(CODE[t]||"??").replace("gb-","").toUpperCase();
+  return `<img class="flag ${cls||''}" src="${u}" alt="${esc(t)}" loading="lazy"
+    onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'flag ${cls||''}',textContent:'${ab}',style:'display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#9fb0d6'}))">`;
+}
+
+const GROUPS = {
+  A:["Mexico","South Africa","South Korea","Czechia"],
+  B:["Canada","Bosnia & Herzegovina","Qatar","Switzerland"],
+  C:["Brazil","Morocco","Haiti","Scotland"],
+  D:["United States","Paraguay","Australia","Türkiye"],
+  E:["Ivory Coast","Ecuador","Germany","Curaçao"],
+  F:["Netherlands","Japan","Sweden","Tunisia"],
+  G:["Iran","New Zealand","Belgium","Egypt"],
+  H:["Saudi Arabia","Uruguay","Spain","Cape Verde"],
+  I:["France","Senegal","Iraq","Norway"],
+  J:["Argentina","Algeria","Austria","Jordan"],
+  K:["Portugal","DR Congo","Uzbekistan","Colombia"],
+  L:["Ghana","Panama","England","Croatia"]
+};
+const M = [
+  ["A1","A","Mexico","South Africa","2026-06-11T19:00Z","Estadio Azteca, Mexico City"],
+  ["A2","A","South Korea","Czechia","2026-06-12T02:00Z","Estadio Akron, Zapopan"],
+  ["A3","A","Czechia","South Africa","2026-06-18T16:00Z","Mercedes-Benz Stadium, Atlanta"],
+  ["A4","A","Mexico","South Korea","2026-06-19T01:00Z","Estadio Akron, Zapopan"],
+  ["A5","A","Czechia","Mexico","2026-06-25T01:00Z","Estadio Azteca, Mexico City"],
+  ["A6","A","South Africa","South Korea","2026-06-25T01:00Z","Estadio BBVA, Guadalupe"],
+  ["B1","B","Canada","Bosnia & Herzegovina","2026-06-12T19:00Z","BMO Field, Toronto"],
+  ["B2","B","Qatar","Switzerland","2026-06-13T19:00Z","Levi's Stadium, Santa Clara"],
+  ["B3","B","Switzerland","Bosnia & Herzegovina","2026-06-18T19:00Z","SoFi Stadium, Inglewood"],
+  ["B4","B","Canada","Qatar","2026-06-18T22:00Z","BC Place, Vancouver"],
+  ["B5","B","Switzerland","Canada","2026-06-24T19:00Z","BC Place, Vancouver"],
+  ["B6","B","Bosnia & Herzegovina","Qatar","2026-06-24T19:00Z","Lumen Field, Seattle"],
+  ["C1","C","Brazil","Morocco","2026-06-13T22:00Z","Gillette Stadium, Foxborough"],
+  ["C2","C","Haiti","Scotland","2026-06-14T01:00Z","MetLife Stadium, East Rutherford"],
+  ["C3","C","Scotland","Morocco","2026-06-19T22:00Z","Lincoln Financial Field, Philadelphia"],
+  ["C4","C","Brazil","Haiti","2026-06-20T01:00Z","Gillette Stadium, Foxborough"],
+  ["C5","C","Scotland","Brazil","2026-06-24T22:00Z","Hard Rock Stadium, Miami Gardens"],
+  ["C6","C","Morocco","Haiti","2026-06-24T22:00Z","Mercedes-Benz Stadium, Atlanta"],
+  ["D1","D","United States","Paraguay","2026-06-13T01:00Z","SoFi Stadium, Inglewood"],
+  ["D2","D","Australia","Türkiye","2026-06-14T04:00Z","BC Place, Vancouver"],
+  ["D3","D","Türkiye","Paraguay","2026-06-20T04:00Z","Levi's Stadium, Santa Clara"],
+  ["D4","D","United States","Australia","2026-06-19T19:00Z","Lumen Field, Seattle"],
+  ["D5","D","Türkiye","United States","2026-06-26T02:00Z","SoFi Stadium, Inglewood"],
+  ["D6","D","Paraguay","Australia","2026-06-26T02:00Z","Levi's Stadium, Santa Clara"],
+  ["E1","E","Ivory Coast","Ecuador","2026-06-14T23:00Z","Lincoln Financial Field, Philadelphia"],
+  ["E2","E","Germany","Curaçao","2026-06-14T17:00Z","NRG Stadium, Houston"],
+  ["E3","E","Germany","Ivory Coast","2026-06-20T20:00Z","BMO Field, Toronto"],
+  ["E4","E","Ecuador","Curaçao","2026-06-21T00:00Z","Arrowhead Stadium, Kansas City"],
+  ["E5","E","Curaçao","Ivory Coast","2026-06-25T20:00Z","Lincoln Financial Field, Philadelphia"],
+  ["E6","E","Ecuador","Germany","2026-06-25T20:00Z","MetLife Stadium, East Rutherford"],
+  ["F1","F","Netherlands","Japan","2026-06-14T20:00Z","AT&T Stadium, Arlington"],
+  ["F2","F","Sweden","Tunisia","2026-06-15T01:00Z","Estadio BBVA, Guadalupe"],
+  ["F3","F","Netherlands","Sweden","2026-06-20T17:00Z","NRG Stadium, Houston"],
+  ["F4","F","Tunisia","Japan","2026-06-21T03:00Z","Estadio BBVA, Guadalupe"],
+  ["F5","F","Japan","Sweden","2026-06-26T00:00Z","AT&T Stadium, Arlington"],
+  ["F6","F","Tunisia","Netherlands","2026-06-26T00:00Z","Arrowhead Stadium, Kansas City"],
+  ["G1","G","Iran","New Zealand","2026-06-16T01:00Z","SoFi Stadium, Inglewood"],
+  ["G2","G","Belgium","Egypt","2026-06-15T19:00Z","Lumen Field, Seattle"],
+  ["G3","G","Belgium","Iran","2026-06-21T19:00Z","SoFi Stadium, Inglewood"],
+  ["G4","G","New Zealand","Egypt","2026-06-22T01:00Z","BC Place, Vancouver"],
+  ["G5","G","Egypt","Iran","2026-06-27T03:00Z","Lumen Field, Seattle"],
+  ["G6","G","New Zealand","Belgium","2026-06-27T03:00Z","BC Place, Vancouver"],
+  ["H1","H","Saudi Arabia","Uruguay","2026-06-15T22:00Z","Hard Rock Stadium, Miami Gardens"],
+  ["H2","H","Spain","Cape Verde","2026-06-15T16:00Z","Mercedes-Benz Stadium, Atlanta"],
+  ["H3","H","Uruguay","Cape Verde","2026-06-21T22:00Z","Hard Rock Stadium, Miami Gardens"],
+  ["H4","H","Spain","Saudi Arabia","2026-06-21T16:00Z","Mercedes-Benz Stadium, Atlanta"],
+  ["H5","H","Cape Verde","Saudi Arabia","2026-06-27T01:00Z","NRG Stadium, Houston"],
+  ["H6","H","Uruguay","Spain","2026-06-27T01:00Z","Estadio Akron, Zapopan"],
+  ["I1","I","France","Senegal","2026-06-16T19:00Z","MetLife Stadium, East Rutherford"],
+  ["I2","I","Iraq","Norway","2026-06-16T22:00Z","Gillette Stadium, Foxborough"],
+  ["I3","I","Norway","Senegal","2026-06-23T00:00Z","MetLife Stadium, East Rutherford"],
+  ["I4","I","France","Iraq","2026-06-22T21:00Z","Lincoln Financial Field, Philadelphia"],
+  ["I5","I","Norway","France","2026-06-26T19:00Z","Gillette Stadium, Foxborough"],
+  ["I6","I","Senegal","Iraq","2026-06-26T19:00Z","BMO Field, Toronto"],
+  ["J1","J","Argentina","Algeria","2026-06-17T01:00Z","Arrowhead Stadium, Kansas City"],
+  ["J2","J","Austria","Jordan","2026-06-17T04:00Z","Levi's Stadium, Santa Clara"],
+  ["J3","J","Argentina","Austria","2026-06-22T17:00Z","AT&T Stadium, Arlington"],
+  ["J4","J","Jordan","Algeria","2026-06-23T03:00Z","Levi's Stadium, Santa Clara"],
+  ["J5","J","Algeria","Austria","2026-06-28T02:00Z","Arrowhead Stadium, Kansas City"],
+  ["J6","J","Jordan","Argentina","2026-06-28T02:00Z","AT&T Stadium, Arlington"],
+  ["K1","K","Portugal","DR Congo","2026-06-17T17:00Z","NRG Stadium, Houston"],
+  ["K2","K","Uzbekistan","Colombia","2026-06-18T02:00Z","Estadio Azteca, Mexico City"],
+  ["K3","K","Portugal","Uzbekistan","2026-06-23T17:00Z","NRG Stadium, Houston"],
+  ["K4","K","Colombia","DR Congo","2026-06-24T02:00Z","Estadio Akron, Zapopan"],
+  ["K5","K","Colombia","Portugal","2026-06-28T00:30Z","Hard Rock Stadium, Miami Gardens"],
+  ["K6","K","DR Congo","Uzbekistan","2026-06-28T00:30Z","Mercedes-Benz Stadium, Atlanta"],
+  ["L1","L","Ghana","Panama","2026-06-18T00:00Z","BMO Field, Toronto"],
+  ["L2","L","England","Croatia","2026-06-17T20:00Z","AT&T Stadium, Arlington"],
+  ["L3","L","England","Ghana","2026-06-23T20:00Z","Gillette Stadium, Foxborough"],
+  ["L4","L","Panama","Croatia","2026-06-24T00:00Z","BMO Field, Toronto"],
+  ["L5","L","Panama","England","2026-06-27T21:00Z","MetLife Stadium, East Rutherford"],
+  ["L6","L","Croatia","Ghana","2026-06-27T21:00Z","Lincoln Financial Field, Philadelphia"]
+].map(r=>({id:r[0],grp:r[1],home:r[2],away:r[3],ko:r[4],venue:r[5]}));
+
+const TOURNAMENT_START = new Date("2026-06-11T19:00Z");
+
+/* ===== scoring engine (5 / 3 / 2 / 0) ===== */
+function scorePoints(pred,res){
+  if(!pred||!res)return null;
+  if(pred.h===res.h&&pred.a===res.a)return 5;
+  const out=o=>o.h>o.a?1:o.h<o.a?-1:0;
+  if(out(pred)!==out(res))return 0;
+  if(out(res)===0)return 2;
+  if((pred.h-pred.a)===(res.h-res.a))return 3;
+  return 2;
+}
+const PTS_CLASS=p=>p===5?"pts-5":p===3?"pts-3":p===2?"pts-2":"pts-0";
+
+/* ===== firebase data layer =====
+   Documents:
+     predictions/{slug}  ->  { name, picks:{matchId:{h,a}}, updated }
+     meta/results        ->  { results:{matchId:{h,a}} }
+*/
+async function fbSavePrediction(slug,name,picks){
+  await setDoc(doc(db,"predictions",slug),{name,picks,updated:Date.now()});
+}
+async function fbLoadPrediction(slug){
+  const s=await getDoc(doc(db,"predictions",slug));return s.exists()?s.data():null;
+}
+async function fbLoadAll(){
+  const snap=await getDocs(collection(db,"predictions"));const out=[];
+  snap.forEach(d=>{const v=d.data();if(v&&v.name)out.push(v);});return out;
+}
+async function fbSaveResults(results){ await setDoc(doc(db,"meta","results"),{results}); }
+async function fbLoadResults(){
+  const s=await getDoc(doc(db,"meta","results"));return s.exists()?(s.data().results||{}):{};
+}
+
+/* ===== state ===== */
+let ME=null, PICKS={}, TAB="predict", ALL=[], RESULTS={}, IS_ADMIN=false;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1900);}
+const nowD=()=>new Date();
+const locked=()=>nowD()>=TOURNAMENT_START;
+const matchLocked=m=>nowD()>=new Date(m.ko);
+function fmtKO(iso){return new Date(iso).toLocaleString(undefined,{weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});}
+const slug=s=>s.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"").slice(0,40);
+const LSKEY="wc26_name";
+
+/* ===== countdown ===== */
+function renderCountdown(){
+  const el=$("countdown"),diff=TOURNAMENT_START-nowD();
+  if(diff<=0){el.innerHTML=`<div class="cd"><div class="n" style="color:var(--accent)">LIVE</div><div class="l">Tournament under way</div></div>`;return;}
+  const d=Math.floor(diff/864e5),h=Math.floor(diff%864e5/36e5),m=Math.floor(diff%36e5/6e4),s=Math.floor(diff%6e4/1e3);
+  el.innerHTML=[["days",d],["hrs",h],["min",m],["sec",s]].map(([l,n])=>`<div class="cd"><div class="n">${String(n).padStart(2,"0")}</div><div class="l">${l}</div></div>`).join("");
+}
+setInterval(renderCountdown,1000);renderCountdown();
+
+/* ===== boot ===== */
+(async function init(){
+  if(!FIREBASE_OK){
+    $("app").innerHTML=`<div class="setupwarn"><h2>Firebase not configured yet</h2>
+      <p>This file needs your Firebase project keys before it can save predictions. Open the file, find the <code>firebaseConfig</code> block near the top of the script, and paste in the six values from your Firebase console (Project settings → Your apps → Web app). Then re-upload.</p></div>`;
+    return;
+  }
+  try{
+    ME=localStorage.getItem(LSKEY);
+    RESULTS=await fbLoadResults();
+    if(ME){const p=await fbLoadPrediction(slug(ME));PICKS=p&&p.picks?p.picks:{};}
+    render();
+  }catch(e){
+    console.error(e);
+    $("app").innerHTML=`<div class="setupwarn"><h2>Couldn't reach the database</h2>
+      <p>Firebase is configured but the read failed. Check that Firestore is enabled and its rules allow read/write. Details in the browser console.</p></div>`;
+  }
+})();
+
+function setWhoami(){
+  const w=$("whoami");
+  if(ME)w.innerHTML=`Signed in as <b>${esc(ME)}</b><br><button class="btn ghost sm" style="margin-top:4px" id="switchBtn">Switch player</button>`;
+  else w.innerHTML="";
+  const sb=$("switchBtn");if(sb)sb.onclick=switchUser;
+}
+function switchUser(){localStorage.removeItem(LSKEY);ME=null;PICKS={};IS_ADMIN=false;TAB="predict";render();}
+
+/* ===== render ===== */
+function render(){
+  setWhoami();
+  const app=$("app");
+  if(!ME){app.innerHTML=gateHTML();wireGate();return;}
+  app.innerHTML=tabsHTML()+
+    (TAB==="predict"?predictHTML():
+     TAB==="leaderboard"?`<div id="lbRoot"><div class="loading">Tallying…</div></div>`:
+     TAB==="rules"?rulesHTML():
+     `<div id="adminRoot"></div>`);
+  wireTabs();
+  if(TAB==="predict")wirePredict();
+  else if(TAB==="leaderboard")loadLeaderboard();
+  else if(TAB==="admin")renderAdmin();
+}
+
+function gateHTML(){
+  return `<div class="card pad gate">
+    <h2>Enter your name to start</h2>
+    <p>Predictions save under this name. Use the same name on this device or any other to come back and edit before the first kickoff.</p>
+    <input type="text" id="nameIn" placeholder="e.g. Omar" maxlength="40" autocomplete="off">
+    <button class="btn block" id="goBtn" disabled>Start predicting</button>
+    <div class="hint">Once the tournament kicks off, predictions lock and everyone's picks become visible to the pool. Pick a name nobody else is using.</div>
+  </div>`;
+}
+function wireGate(){
+  const inp=$("nameIn"),btn=$("goBtn");inp.focus();
+  const v=()=>btn.disabled=inp.value.trim().length<2;
+  inp.addEventListener("input",v);
+  inp.addEventListener("keydown",e=>{if(e.key==="Enter"&&!btn.disabled)start();});
+  btn.addEventListener("click",start);
+  async function start(){
+    ME=inp.value.trim();localStorage.setItem(LSKEY,ME);
+    try{const p=await fbLoadPrediction(slug(ME));PICKS=p&&p.picks?p.picks:{};}catch(e){PICKS={};}
+    TAB="predict";render();
+  }
+}
+
+function tabsHTML(){
+  const t=(id,label)=>`<button data-t="${id}" class="${TAB===id?"on":""}">${label}</button>`;
+  return `<div class="tabs">${t("predict","My predictions")}${t("leaderboard","Leaderboard")}${t("rules","Scoring")}${t("admin","Results")}</div>`;
+}
+function wireTabs(){document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{TAB=b.dataset.t;render();});}
+
+/* ===== predict ===== */
+function predictHTML(){
+  const isLocked=locked();
+  let h=isLocked
+    ? `<div class="banner lock"><span>🔒</span><span>The tournament has started — predictions are locked. Check the <b>Leaderboard</b> for standings and everyone's picks.</span></div>`
+    : `<div class="banner ok"><span>⚽</span><span>Predict the <b>exact score</b> of every match with the +/− steppers. Saves to the cloud automatically. Picks lock at the first kickoff on June 11.</span></div>`;
+  for(const g of Object.keys(GROUPS)){
+    h+=`<div class="card"><div class="grouphdr"><span class="gname">Group ${g}</span><span class="teams">${GROUPS[g].map(t=>flagImg(t,'sm')).join(" ")}</span></div>`;
+    for(const m of M.filter(x=>x.grp===g)){
+      const p=PICKS[m.id],ml=isLocked||matchLocked(m),res=RESULTS[m.id];
+      const pts=(res&&p)?scorePoints(p,res):null;
+      h+=`<div class="match"><div class="meta"><span>${esc(fmtKO(m.ko))}</span><span class="dot"></span><span>${esc(m.venue)}</span>
+        ${res?`<span class="result-chip final">FT ${res.h}–${res.a}${pts!==null?` <span class="pts-badge ${PTS_CLASS(pts)}">+${pts}</span>`:""}</span>`:""}</div>
+        <div class="scorer" data-mid="${m.id}">
+          <div class="teamcol home">${flagImg(m.home,'lg')}<span class="nm">${esc(m.home)}</span></div>
+          <div style="display:flex;gap:14px;align-items:flex-start">
+            ${stepperHTML(m.id,"h",p?p.h:0,ml)}<span class="vs">–</span>${stepperHTML(m.id,"a",p?p.a:0,ml)}
+          </div>
+          <div class="teamcol away"><span class="nm">${esc(m.away)}</span>${flagImg(m.away,'lg')}</div>
+        </div>
+        <div class="pickstate ${p?'':'empty'}" data-state="${m.id}">${pickStateText(m,p)}</div>
+      </div>`;
+    }
+    h+=`</div>`;
+  }
+  if(!isLocked)h+=savebarHTML();
+  return h;
+}
+function stepperHTML(mid,side,val,lk){
+  return `<div class="stepper" data-side="${side}">
+    <div class="val" data-val="${mid}-${side}">${val}</div>
+    <div class="stepbtns">
+      <button data-act="dec" data-mid="${mid}" data-side="${side}" ${lk?"disabled":""}>−</button>
+      <button data-act="inc" data-mid="${mid}" data-side="${side}" ${lk?"disabled":""}>+</button>
+    </div></div>`;
+}
+function pickStateText(m,p){
+  if(!p)return "No prediction yet";
+  const w=p.h>p.a?m.home:p.a>p.h?m.away:null;
+  return w?`Your call: <b>${esc(m.home)} ${p.h}–${p.a} ${esc(m.away)}</b> · ${esc(w)} win`
+          :`Your call: <b>${esc(m.home)} ${p.h}–${p.a} ${esc(m.away)}</b> · draw`;
+}
+function savebarHTML(){
+  const done=Object.keys(PICKS).length;
+  return `<div class="savebar"><div class="row">
+    <div class="prog"><b>${done}</b> / ${M.length} matches predicted${done===M.length?" — all done! 🎉":""}</div>
+    <button class="btn sm" id="toLb">Leaderboard ↗</button></div></div>`;
+}
+function wirePredict(){
+  const toLb=$("toLb");if(toLb)toLb.onclick=()=>{TAB="leaderboard";render();};
+  if(locked())return;
+  document.querySelectorAll('.stepbtns button[data-act]').forEach(btn=>{
+    if(btn.disabled)return;
+    btn.onclick=async()=>{
+      const mid=btn.dataset.mid,side=btn.dataset.side,act=btn.dataset.act,m=M.find(x=>x.id===mid);
+      if(matchLocked(m))return;
+      const cur=PICKS[mid]||{h:0,a:0};
+      let v=Math.max(0,Math.min(20,cur[side]+(act==="inc"?1:-1)));
+      cur[side]=v;PICKS[mid]={h:cur.h,a:cur.a};
+      $("app").querySelector(`[data-val="${mid}-${side}"]`).textContent=v;
+      const st=document.querySelector(`[data-state="${mid}"]`);
+      st.classList.remove("empty");st.innerHTML=pickStateText(m,PICKS[mid]);
+      try{await fbSavePrediction(slug(ME),ME,PICKS);}catch(e){toast("Save failed — check connection");}
+      const prog=document.querySelector(".savebar .prog");
+      if(prog){const d=Object.keys(PICKS).length;prog.innerHTML=`<b>${d}</b> / ${M.length} matches predicted${d===M.length?" — all done! 🎉":""}`;}
+    };
+  });
+}
+
+/* ===== leaderboard ===== */
+async function loadLeaderboard(){
+  try{ALL=await fbLoadAll();RESULTS=await fbLoadResults();}catch(e){ALL=[];}
+  renderLeaderboard();
+}
+function tallyPlayer(p){
+  let pts=0,exact=0,played=0,correct=0;
+  for(const id in RESULTS){
+    const pred=p.picks[id];if(!pred)continue;
+    const s=scorePoints(pred,RESULTS[id]);if(s===null)continue;
+    played++;pts+=s;if(s===5)exact++;if(s>=2)correct++;
+  }
+  return {pts,exact,played,correct,picks:Object.keys(p.picks||{}).length};
+}
+function renderLeaderboard(){
+  const root=$("lbRoot");if(!root)return;
+  const showPicks=locked();const finals=Object.keys(RESULTS).length;
+  if(ALL.length===0){root.innerHTML=`<div class="card pad empty"><div class="big">🗳️</div>No one's in the pool yet.<br>Add your predictions to get started.</div>`;return;}
+  const rows=ALL.map(p=>({name:p.name,...tallyPlayer(p)})).sort((a,b)=>b.pts-a.pts||b.exact-a.exact||b.correct-a.correct);
+  let h="";
+  h+=finals===0
+    ? `<div class="banner info"><span>📊</span><span>${ALL.length} player${ALL.length>1?"s":""} in the pool. Points appear as soon as results are entered under <b>Results</b>. Ranked by points, then exact scores.</span></div>`
+    : `<div class="banner ok"><span>🏆</span><span>${finals} match${finals>1?"es":""} scored. Ranked by points → exact scores → correct results.</span></div>`;
+  h+=`<div class="card"><table class="lb"><thead><tr><th class="rank">#</th><th>Player</th><th class="r">Exact</th><th class="r">Correct</th><th class="r">Points</th></tr></thead><tbody>`;
+  rows.forEach((r,i)=>{
+    const rk=i+1,gc=rk<=3?`g${rk}`:"";
+    h+=`<tr class="${r.name===ME?'me':''}"><td class="rank ${gc}">${rk}</td>
+      <td class="who">${esc(r.name)}${r.name===ME?' <span style="color:var(--accent);font-weight:400">(you)</span>':''}<div class="mini">${r.picks}/${M.length} predicted</div></td>
+      <td class="r mini">${r.exact}</td><td class="r mini">${r.correct}/${r.played}</td><td class="r pts">${r.pts}</td></tr>`;
+  });
+  h+=`</tbody></table></div>`;
+  if(!showPicks){
+    h+=`<div class="banner lock"><span>🔒</span><span>Everyone's individual score predictions stay hidden until the first kickoff (June 11), so nobody copies.</span></div>`;
+  }else{
+    h+=`<div class="banner ok"><span>👁️</span><span>Picks revealed. Each match shows every player's predicted scoreline${finals?" and the points it earned":""}.</span></div>`;
+    for(const g of Object.keys(GROUPS)){
+      h+=`<div class="card"><div class="grouphdr"><span class="gname">Group ${g}</span><span class="teams">${GROUPS[g].map(t=>flagImg(t,'sm')).join(" ")}</span></div>`;
+      for(const m of M.filter(x=>x.grp===g)){
+        const res=RESULTS[m.id];
+        h+=`<div class="match"><div class="meta"><span>${flagImg(m.home,'sm')} ${esc(m.home)} v ${esc(m.away)} ${flagImg(m.away,'sm')}</span><span class="dot"></span><span>${esc(fmtKO(m.ko))}</span>${res?`<span class="result-chip final">FT ${res.h}–${res.a}</span>`:""}</div><div style="display:flex;flex-wrap:wrap;gap:7px">`;
+        const preds=ALL.map(p=>({name:p.name,pred:p.picks[m.id]})).filter(x=>x.pred);
+        if(preds.length===0)h+=`<span class="mini">No predictions for this match.</span>`;
+        preds.forEach(x=>{
+          const pts=res?scorePoints(x.pred,res):null;
+          h+=`<span style="background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:5px 10px;font-size:12px"><b style="font-weight:600">${esc(x.name)}</b> <span style="color:var(--muted)">${x.pred.h}–${x.pred.a}</span>${pts!==null?` <span class="pts-badge ${PTS_CLASS(pts)}">+${pts}</span>`:""}</span>`;
+        });
+        h+=`</div></div>`;
+      }
+      h+=`</div>`;
+    }
+  }
+  root.innerHTML=h;
+}
+
+/* ===== scoring rules ===== */
+function rulesHTML(){
+  return `<div class="card pad">
+    <h2 style="font-size:18px;font-weight:700;margin-bottom:6px">How points work</h2>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:16px">You predict the exact scoreline of every match. After each game, points are awarded automatically based on how close you were.</p>
+    <div class="scoring-grid">
+      <div class="sc-card"><div class="pn gold">5</div><div class="pl"><b>Exact score</b><br>You nailed the precise scoreline (you said 2–1, it finished 2–1).</div></div>
+      <div class="sc-card"><div class="pn blue">3</div><div class="pl"><b>Right margin</b><br>Correct winner and correct goal difference, wrong score (2–1 vs an actual 3–2).</div></div>
+      <div class="sc-card"><div class="pn gray">2</div><div class="pl"><b>Right result</b><br>Correct winner or correctly called a draw, wrong margin (2–1 vs 4–0).</div></div>
+      <div class="sc-card"><div class="pn" style="color:#f0908f">0</div><div class="pl"><b>Missed</b><br>Wrong outcome — you backed the other side or missed a draw.</div></div>
+    </div>
+    <h3 style="font-size:15px;font-weight:700;margin:22px 0 6px">Worked examples</h3>
+    <table class="lb" style="border:1px solid var(--line);border-radius:11px;overflow:hidden">
+      <thead><tr><th>You predicted</th><th>Actual result</th><th class="r">Points</th></tr></thead>
+      <tbody>
+        <tr><td>Brazil 2–1</td><td>Brazil 2–1</td><td class="r pts" style="color:var(--gold)">5</td></tr>
+        <tr><td>Brazil 2–1</td><td>Brazil 3–2</td><td class="r pts" style="color:#7ab6ec">3</td></tr>
+        <tr><td>Brazil 2–1</td><td>Brazil 4–0</td><td class="r pts" style="color:var(--draw)">2</td></tr>
+        <tr><td>Draw 1–1</td><td>Draw 2–2</td><td class="r pts" style="color:var(--draw)">2</td></tr>
+        <tr><td>Draw 1–1</td><td>Draw 1–1</td><td class="r pts" style="color:var(--gold)">5</td></tr>
+        <tr><td>Brazil 2–1</td><td>Morocco 1–0</td><td class="r pts" style="color:#f0908f">0</td></tr>
+      </tbody>
+    </table>
+    <p class="hint">Leaderboard ties break by number of exact scores, then by correct results.</p>
+  </div>`;
+}
+
+/* ===== admin / results ===== */
+function renderAdmin(){
+  const root=$("adminRoot");
+  if(!IS_ADMIN){
+    root.innerHTML=`<div class="card pad gate">
+      <h2>Enter match results</h2>
+      <p>Whoever runs the pool enters final scores here. Points are awarded to everyone automatically. Enter the admin code to unlock.</p>
+      <input type="text" id="adminIn" placeholder="Admin code" autocomplete="off">
+      <button class="btn block" id="adminBtn">Unlock results entry</button>
+      <div class="hint">Set the code in the <code>ADMIN_CODE</code> line of the file before sharing. Later, results entry can be replaced by an automatic feed from a football API.</div>
+    </div>`;
+    $("adminBtn").onclick=()=>{if($("adminIn").value.trim()===ADMIN_CODE){IS_ADMIN=true;loadAdminData();}else toast("Wrong code");};
+    $("adminIn").addEventListener("keydown",e=>{if(e.key==="Enter")$("adminBtn").click();});
+    return;
+  }
+  let h=`<div class="banner ok"><span>🔓</span><span>Results entry unlocked. Set a score and tap <b>Save</b> — points recompute for everyone immediately. Leave a match blank if unplayed.</span></div>`;
+  for(const g of Object.keys(GROUPS)){
+    h+=`<div class="card"><div class="grouphdr"><span class="gname">Group ${g}</span></div>`;
+    for(const m of M.filter(x=>x.grp===g)){
+      const r=RESULTS[m.id];
+      h+=`<div class="admin-match"><div class="teamcol home">${flagImg(m.home,'sm')}<span class="nm">${esc(m.home)}</span></div>
+        <div class="admin-score">
+          <input type="text" inputmode="numeric" maxlength="2" id="r-${m.id}-h" value="${r?r.h:''}" placeholder="–">
+          <span style="color:var(--faint)">:</span>
+          <input type="text" inputmode="numeric" maxlength="2" id="r-${m.id}-a" value="${r?r.a:''}" placeholder="–">
+          <button class="btn sm" data-save="${m.id}" style="margin-left:8px">Save</button>
+          ${r?`<button class="btn sm danger" data-clear="${m.id}" style="margin-left:4px">Clear</button>`:""}
+        </div>
+        <div class="teamcol away"><span class="nm">${esc(m.away)}</span>${flagImg(m.away,'sm')}</div></div>`;
+    }
+    h+=`</div>`;
+  }
+  root.innerHTML=h;
+  root.querySelectorAll("[data-save]").forEach(b=>b.onclick=()=>saveResult(b.dataset.save));
+  root.querySelectorAll("[data-clear]").forEach(b=>b.onclick=()=>clearResult(b.dataset.clear));
+}
+async function loadAdminData(){try{RESULTS=await fbLoadResults();}catch(e){}renderAdmin();}
+async function saveResult(mid){
+  const hv=parseInt($(`r-${mid}-h`).value,10),av=parseInt($(`r-${mid}-a`).value,10);
+  if(isNaN(hv)||isNaN(av)||hv<0||av<0){toast("Enter both scores");return;}
+  RESULTS[mid]={h:hv,a:av};
+  try{await fbSaveResults(RESULTS);toast(`Saved ${hv}–${av} · points updated`);}catch(e){toast("Save failed");}
+  renderAdmin();
+}
+async function clearResult(mid){
+  delete RESULTS[mid];
+  try{await fbSaveResults(RESULTS);toast("Result cleared");}catch(e){toast("Save failed");}
+  renderAdmin();
+}
+
+</script>
+</body>
+</html>
