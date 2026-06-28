@@ -1282,8 +1282,19 @@ function renderLeaderboard(){
   rows.forEach((r,i)=>{
     const rk=i+1,gc=rk<=3?`g${rk}`:"";
     const side=r.brk+r.gld;
+    // rank emoji: medals for top 3; bucket (جردل) for the bottom two.
+    // only show buckets when the pool is big enough (≥6) that they can't collide with medals,
+    // and only once at least one match has been scored (so a fresh 0-0-0 board doesn't shame anyone).
+    let badge="";
+    if(rk===1)badge=" 👑";
+    else if(rk===2)badge=" 🥈";
+    else if(rk===3)badge=" 🥉";
+    else if(finals>0 && rows.length>=6 && rk>=rows.length-1)badge=" 🪣";
+    // name-specific badge (inside joke): a log for Hussen, in addition to any rank emoji
+    const LOG_NAMES=["hussen","hussein","hussain","husein","حسين"];
+    if(LOG_NAMES.includes((r.name||"").toLowerCase().trim())) badge+=" 🪵";
     h+=`<tr class="lbrow ${r.name===ME?'me':''}" data-player="${esc(r.name)}"><td class="rank ${gc}">${rk}</td>
-      <td class="who"><span class="lbname">${esc(r.name)}${r.name===ME?' <span style="color:var(--accent);font-weight:400">(you)</span>':''} <span class="lbcaret" data-caret="${esc(r.name)}">▾</span></span><div class="mini">${r.exact} exact · ${r.correct}/${r.played} correct${r.gld?` · +${r.gld} awards`:""}</div></td>
+      <td class="who"><span class="lbname">${esc(r.name)}${badge}${r.name===ME?' <span style="color:var(--accent);font-weight:400">(you)</span>':''} <span class="lbcaret" data-caret="${esc(r.name)}">▾</span></span><div class="mini">${r.exact} exact · ${r.correct}/${r.played} correct${r.gld?` · +${r.gld} awards`:""}</div></td>
       <td class="r mini">${r.groupPts}</td><td class="r mini">${r.koPts}</td><td class="r mini">${side}</td><td class="r pts">${r.pts}</td></tr>
       <tr class="perfrow" data-perf="${esc(r.name)}" style="display:none"><td></td><td colspan="5" class="perfcell"></td></tr>`;
   });
