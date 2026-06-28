@@ -171,6 +171,12 @@
   .award-row input{text-align:left;font-size:14px;padding:11px 13px}
   .gw-chip{font-size:11px;padding:3px 9px;border-radius:6px;margin-left:8px;font-weight:700}
   .gw-chip.hit{background:rgba(29,158,117,.18);color:var(--green)}
+  .lb-groupwrap{margin-top:6px}
+  .lb-grouptop{display:flex;align-items:center;justify-content:space-between;margin:14px 2px 8px}
+  .lb-grouptop .gs-title{font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+  .lb-acc{margin-bottom:8px}
+  .lb-acchdr{user-select:none}
+  .lb-acchdr:hover{background:var(--panel)}
   .gw-chip.miss{background:rgba(226,75,74,.14);color:#f0908f}
   .lbcaret{font-size:11px;color:var(--faint);margin-left:4px}
   .lbrow:hover{background:rgba(255,255,255,.02)}
@@ -180,12 +186,48 @@
   .perfline .pi{flex:0 0 auto;font-size:15px}
   .perfline b{color:var(--accent);font-weight:700}
   @media(max-width:560px){
+    .wrap{padding:18px 10px 80px}
+    h1{font-size:18px}
+    .sub{font-size:11.5px}
+    .crest{width:38px;height:38px;font-size:20px}
+    .whoami{font-size:12px}
+    .countdown{gap:5px;margin:14px 0 16px}
+    .cd .n{font-size:18px} .cd .l{font-size:8.5px;letter-spacing:.08em}
+    .tabs{gap:3px;padding:4px}
+    .tabs button{flex:1 1 auto;font-size:12px;padding:9px 4px}
     .teamcol .nm{font-size:12px}
     .stepper .val{font-size:24px;width:38px}
     .stepbtns button{width:26px}
     .tree-col,.tree-col.r16,.tree-col.qf,.tree-col.sf{min-width:132px}
     .tree-center{min-width:150px}
     .br-team{font-size:11.5px;padding:6px 7px}
+    /* leaderboard: tighten padding, shrink number columns, keep Total prominent */
+    .card.pad{padding:16px}
+    table.lb th,table.lb td{padding:10px 6px;font-size:13px}
+    table.lb th:first-child,table.lb td.rank{padding-left:10px}
+    table.lb .rank{width:26px}
+    table.lb th.r,table.lb td.r{font-size:12px}
+    table.lb .who{font-size:13px}
+    table.lb .mini{font-size:10.5px}
+    table.lb .pts{font-size:14px;padding-right:10px}
+    /* the three breakdown columns are secondary on mobile — dim + narrow */
+    table.lb th.sub-col,table.lb td.sub-col{font-size:11px;color:var(--faint);padding:10px 3px}
+    .grouphdr{padding:12px 14px}
+    .grouphdr .gname{font-size:14px}
+    .match{padding:14px 14px}
+    .meta{font-size:10.5px}
+    .banner{font-size:12px;padding:10px 13px}
+    .perfcell{padding:0 10px 12px!important}
+    .perfline{font-size:12.5px}
+  }
+  @media(max-width:380px){
+    table.lb th,table.lb td{padding:9px 4px;font-size:12px}
+    table.lb .who{font-size:12px}
+    table.lb .sub-col{display:none}
+    .tabs button{font-size:11px;padding:8px 3px}
+    .scorer{gap:6px}
+    .stepper .val{font-size:21px;width:32px}
+    .stepbtns button{width:23px;height:26px}
   }
 </style>
 </head>
@@ -559,6 +601,7 @@ let BRACKET={advance:{},champ:""};  // my bracket
 let GOLDEN={boot:"",glove:"",ball:""};  // my golden picks
 let GOLDEN_WINNERS={}; // admin-set winners
 let KO_ACTIVE_ROUND="R32";  // which round tab is showing in Knockouts
+let LB_OPEN_GROUPS={};      // which group accordions are expanded in the leaderboard reveal (collapsed by default)
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1900);}
@@ -1281,7 +1324,7 @@ function renderLeaderboard(){
   h+=finals===0
     ? `<div class="banner info"><span>📊</span><span>${ALL.length} player${ALL.length>1?"s":""} in the pool. Points appear as soon as results are entered under <b>Results</b>. Ranked by points, then exact scores.</span></div>`
     : `<div class="banner ok"><span>🏆</span><span>${finals} match${finals>1?"es":""} scored. Ranked by points → exact scores → correct results.</span></div>`;
-  h+=`<div class="card"><table class="lb"><thead><tr><th class="rank">#</th><th>Player</th><th class="r">Group</th><th class="r">KO</th><th class="r">Brkt</th><th class="r">Total</th></tr></thead><tbody>`;
+  h+=`<div class="card"><table class="lb"><thead><tr><th class="rank">#</th><th>Player</th><th class="r sub-col">Group</th><th class="r sub-col">KO</th><th class="r sub-col">Brkt</th><th class="r">Total</th></tr></thead><tbody>`;
   rows.forEach((r,i)=>{
     const rk=i+1,gc=rk<=3?`g${rk}`:"";
     const side=r.brk+r.gld;
@@ -1298,30 +1341,15 @@ function renderLeaderboard(){
     if(LOG_NAMES.includes((r.name||"").toLowerCase().trim())) badge+=" 🪵";
     h+=`<tr class="lbrow ${r.name===ME?'me':''}" data-player="${esc(r.name)}"><td class="rank ${gc}">${rk}</td>
       <td class="who"><span class="lbname">${esc(r.name)}${badge}${r.name===ME?' <span style="color:var(--accent);font-weight:400">(you)</span>':''} <span class="lbcaret" data-caret="${esc(r.name)}">▾</span></span><div class="mini">${r.exact} exact · ${r.correct}/${r.played} correct${r.gld?` · +${r.gld} awards`:""}</div></td>
-      <td class="r mini">${r.groupPts}</td><td class="r mini">${r.koPts}</td><td class="r mini">${side}</td><td class="r pts">${r.pts}</td></tr>
-      <tr class="perfrow" data-perf="${esc(r.name)}" style="display:none"><td></td><td colspan="5" class="perfcell"></td></tr>`;
+      <td class="r mini sub-col">${r.groupPts}</td><td class="r mini sub-col">${r.koPts}</td><td class="r mini sub-col">${side}</td><td class="r pts">${r.pts}</td></tr>
+      <tr class="perfrow" data-perf="${esc(r.name)}" style="display:none"><td colspan="6" class="perfcell"></td></tr>`;
   });
   h+=`</tbody></table></div>`;
   if(!showPicks){
     h+=`<div class="banner lock"><span>🔒</span><span>Everyone's individual score predictions stay hidden until the first kickoff (June 11), so nobody copies.</span></div>`;
   }else{
     h+=`<div class="banner ok"><span>👁️</span><span>Picks revealed. Each match shows every player's predicted scoreline${finals?" and the points it earned":""}.</span></div>`;
-    for(const g of Object.keys(GROUPS)){
-      h+=`<div class="card"><div class="grouphdr"><span class="gname">Group ${g}</span><span class="teams">${GROUPS[g].map(t=>flagImg(t,'sm')).join(" ")}</span></div>`;
-      for(const m of M.filter(x=>x.grp===g)){
-        const res=RESULTS[m.id];
-        h+=`<div class="match"><div class="meta"><span>${flagImg(m.home,'sm')} ${esc(m.home)} v ${esc(m.away)} ${flagImg(m.away,'sm')}</span><span class="dot"></span><span>${esc(fmtKO(m.ko))}</span>${res?`<span class="result-chip final">FT ${res.h}–${res.a}</span>`:""}</div><div style="display:flex;flex-wrap:wrap;gap:7px">`;
-        const preds=ALL.map(p=>({name:p.name,pred:p.picks[m.id]})).filter(x=>x.pred);
-        if(preds.length===0)h+=`<span class="mini">No predictions for this match.</span>`;
-        preds.forEach(x=>{
-          const pts=res?scorePoints(x.pred,res):null;
-          h+=`<span style="background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:5px 10px;font-size:12px"><b style="font-weight:600">${esc(x.name)}</b> <span style="color:var(--muted)">${x.pred.h}–${x.pred.a}</span>${pts!==null?` <span class="pts-badge ${PTS_CLASS(pts)}">+${pts}</span>`:""}</span>`;
-        });
-        h+=`</div></div>`;
-      }
-      h+=`</div>`;
-    }
-    // ===== knockout reveal: each match's picks shown once that match kicks off =====
+    // ===== knockout reveal FIRST (current focus): each match shown once it kicks off =====
     const koRoundsWithFixtures = KO_ROUNDS.filter(r=>roundReady(r.key));
     for(const r of koRoundsWithFixtures){
       let block="";
@@ -1344,6 +1372,27 @@ function renderLeaderboard(){
       }
       if(block) h+=`<div class="card"><div class="grouphdr"><span class="gname">${r.name}</span><span class="teams">×${r.mult}</span></div>${block}</div>`;
     }
+    // ===== group stage reveal: collapsed accordions (stage is done; secondary focus) =====
+    const anyOpen=Object.values(LB_OPEN_GROUPS).some(Boolean);
+    h+=`<div class="lb-groupwrap"><div class="lb-grouptop"><span class="gs-title">Group stage</span><button class="btn ghost sm" id="lbToggleAll">${anyOpen?"Collapse all":"Expand all"}</button></div>`;
+    for(const g of Object.keys(GROUPS)){
+      const open=!!LB_OPEN_GROUPS[g];
+      h+=`<div class="card lb-acc"><div class="grouphdr lb-acchdr" data-lbgroup="${g}" style="cursor:pointer"><span class="gname">Group ${g}</span><span class="teams">${GROUPS[g].map(t=>flagImg(t,'sm')).join(" ")}</span><span class="lb-caret2" style="margin-left:8px;color:var(--faint)">${open?"▴":"▾"}</span></div>`;
+      h+=`<div class="lb-accbody" data-lbbody="${g}" style="display:${open?'block':'none'}">`;
+      for(const m of M.filter(x=>x.grp===g)){
+        const res=RESULTS[m.id];
+        h+=`<div class="match"><div class="meta"><span>${flagImg(m.home,'sm')} ${esc(m.home)} v ${esc(m.away)} ${flagImg(m.away,'sm')}</span><span class="dot"></span><span>${esc(fmtKO(m.ko))}</span>${res?`<span class="result-chip final">FT ${res.h}–${res.a}</span>`:""}</div><div style="display:flex;flex-wrap:wrap;gap:7px">`;
+        const preds=ALL.map(p=>({name:p.name,pred:p.picks[m.id]})).filter(x=>x.pred);
+        if(preds.length===0)h+=`<span class="mini">No predictions for this match.</span>`;
+        preds.forEach(x=>{
+          const pts=res?scorePoints(x.pred,res):null;
+          h+=`<span style="background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:5px 10px;font-size:12px"><b style="font-weight:600">${esc(x.name)}</b> <span style="color:var(--muted)">${x.pred.h}–${x.pred.a}</span>${pts!==null?` <span class="pts-badge ${PTS_CLASS(pts)}">+${pts}</span>`:""}</span>`;
+        });
+        h+=`</div></div>`;
+      }
+      h+=`</div></div>`;
+    }
+    h+=`</div>`;
   }
   root.innerHTML=h;
   // performance cards: consensus + rightmap + superlatives, computed once
@@ -1371,6 +1420,30 @@ function renderLeaderboard(){
       if(caret)caret.textContent="▴";
     };
   });
+  // group accordions: toggle in place, persist state in LB_OPEN_GROUPS
+  root.querySelectorAll(".lb-acchdr").forEach(hdr=>{
+    hdr.onclick=()=>{
+      const g=hdr.dataset.lbgroup;
+      const body=root.querySelector(`[data-lbbody="${g}"]`);
+      const caret=hdr.querySelector(".lb-caret2");
+      const nowOpen = !(LB_OPEN_GROUPS[g]);
+      LB_OPEN_GROUPS[g]=nowOpen;
+      if(body) body.style.display=nowOpen?"block":"none";
+      if(caret) caret.textContent=nowOpen?"▴":"▾";
+    };
+  });
+  const allBtn=root.querySelector("#lbToggleAll");
+  if(allBtn) allBtn.onclick=()=>{
+    const anyOpen=Object.keys(GROUPS).some(g=>LB_OPEN_GROUPS[g]);
+    Object.keys(GROUPS).forEach(g=>{ LB_OPEN_GROUPS[g]=!anyOpen; });
+    Object.keys(GROUPS).forEach(g=>{
+      const body=root.querySelector(`[data-lbbody="${g}"]`);
+      const hdr=root.querySelector(`.lb-acchdr[data-lbgroup="${g}"]`);
+      if(body) body.style.display=(!anyOpen)?"block":"none";
+      if(hdr){const c=hdr.querySelector(".lb-caret2"); if(c)c.textContent=(!anyOpen)?"▴":"▾";}
+    });
+    allBtn.textContent=(!anyOpen)?"Collapse all":"Expand all";
+  };
 }
 
 /* ===== scoring rules ===== */
