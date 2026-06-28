@@ -171,6 +171,13 @@
   .award-row input{text-align:left;font-size:14px;padding:11px 13px}
   .gw-chip{font-size:11px;padding:3px 9px;border-radius:6px;margin-left:8px;font-weight:700}
   .gw-chip.hit{background:rgba(29,158,117,.18);color:var(--green)}
+  .br-toggle{display:flex;gap:5px;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:4px;margin-bottom:14px}
+  .br-toggle button{flex:1;border:none;background:transparent;color:var(--muted);font-size:13px;font-weight:600;padding:9px;border-radius:8px;cursor:pointer}
+  .br-toggle button.on{background:var(--panel-2);color:var(--ink);box-shadow:0 0 0 1px var(--line)}
+  .track{background:var(--panel-2);border-radius:6px;overflow:hidden;position:relative}
+  .fill{height:100%;border-radius:6px;transition:width .4s ease;min-width:2px}
+  .fill.h{background:var(--home)} .fill.a{background:var(--away)}
+  .pool-roundhdr{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:16px 2px 9px}
   .lb-groupwrap{margin-top:6px}
   .lb-grouptop{display:flex;align-items:center;justify-content:space-between;margin:14px 2px 8px}
   .lb-grouptop .gs-title{font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
@@ -592,7 +599,7 @@ async function fbSavePlayerFull(slug,name,data){
 }
 
 /* ===== state ===== */
-let ME=null, PICKS={}, TAB="predict", ALL=[], RESULTS={}, IS_ADMIN=false;
+let ME=null, PICKS={}, TAB="leaderboard", ALL=[], RESULTS={}, IS_ADMIN=false;
 /* knockout / bracket / golden state */
 let KOFIX={};          // admin-set fixtures {koMatchId:{home,away,ko,venue}}
 let KORES={};          // admin-set KO results {koMatchId:{h,a,pens,advTeam}}
@@ -601,6 +608,7 @@ let BRACKET={advance:{},champ:""};  // my bracket
 let GOLDEN={boot:"",glove:"",ball:""};  // my golden picks
 let GOLDEN_WINNERS={}; // admin-set winners
 let KO_ACTIVE_ROUND="R32";  // which round tab is showing in Knockouts
+let BR_VIEW="mine";          // bracket tab view: "mine" or "pool" (anonymous R32 consensus)
 let LB_OPEN_GROUPS={};      // which group accordions are expanded in the leaderboard reveal (collapsed by default)
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -675,7 +683,7 @@ function setWhoami(){
   else w.innerHTML="";
   const sb=$("switchBtn");if(sb)sb.onclick=switchUser;
 }
-function switchUser(){localStorage.removeItem(LSKEY);ME=null;PICKS={};IS_ADMIN=false;TAB="predict";render();}
+function switchUser(){localStorage.removeItem(LSKEY);ME=null;PICKS={};IS_ADMIN=false;TAB="leaderboard";render();}
 
 /* ===== render ===== */
 function render(){
@@ -723,13 +731,13 @@ function wireGate(){
       BRACKET=p&&p.bracket?p.bracket:{advance:{},champ:""};
       GOLDEN=p&&p.golden?p.golden:{boot:"",glove:"",ball:""};
     }catch(e){PICKS={};}
-    TAB="predict";render();
+    TAB="leaderboard";render();
   }
 }
 
 function tabsHTML(){
   const t=(id,label)=>`<button data-t="${id}" class="${TAB===id?"on":""}">${label}</button>`;
-  return `<div class="tabs">${t("predict","Groups")}${t("knockout","Knockouts")}${t("bracket","Bracket")}${t("awards","Awards")}${t("leaderboard","Leaderboard")}${t("rules","Scoring")}${t("admin","Results")}</div>`;
+  return `<div class="tabs">${t("leaderboard","Leaderboard")}${t("knockout","Knockouts")}${t("bracket","Bracket")}${t("awards","Awards")}${t("predict","Groups")}${t("rules","Scoring")}${t("admin","Results")}</div>`;
 }
 function wireTabs(){document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{TAB=b.dataset.t;render();});}
 
@@ -936,7 +944,11 @@ function bracketBodyHTML(){
   const lk=bracketLocked();
   const ready=roundReady("R32");
   if(!ready) return `<div class="banner info"><span>🗺️</span><span>The bracket opens once the Round of 32 fixtures are confirmed.</span></div><div class="card pad empty"><div class="big">⏳</div>Bracket not available yet.</div>`;
-  let h = lk
+  // view toggle
+  const toggle=`<div class="br-toggle"><button data-brview="mine" class="${BR_VIEW==="mine"?"on":""}">My bracket</button><button data-brview="pool" class="${BR_VIEW==="pool"?"on":""}">Pool (R32)</button></div>`;
+  if(BR_VIEW==="pool") return toggle + bracketPoolHTML();
+  let h=toggle;
+  h += lk
     ? `<div class="banner lock"><span>🔒</span><span>The bracket locked at the Round of 32 kickoff. Correct picks are highlighted as results come in. A perfect bracket scores <b>100</b>.</span></div>`
     : `<div class="banner ok"><span>🗺️</span><span>One-off side prize. Tap the team you think advances in each match — winners flow toward the centre. Saves automatically. Locks at the Round of 32 kickoff. Perfect bracket = <b>100 pts</b>.</span></div>`;
   const bs=bracketScore(BRACKET,KORES);
@@ -1020,7 +1032,88 @@ function rerenderBracket(){
   const ns=document.querySelector("#bracketBody .tree-scroll");
   if(ns) ns.scrollLeft=sx;
 }
+/* anonymous R32 pool view: how the whole pool voted on each R32 match (percentages, no names) */
+function bracketPoolHTML(){
+  if(!bracketLocked()){
+    return `<div class="banner lock"><span>🔒</span><span>The pool view opens once brackets lock (first R32 kickoff) — so nobody can copy before the deadline.</span></div>`;
+  }
+  if(ALL.length===0){
+    return `<div class="card pad empty"><div class="big">🗳️</div>No brackets in the pool yet.</div>`;
+  }
+  let h=`<div class="banner ok"><span>📊</span><span>How the whole pool sees the tournament — anonymous, from all ${ALL.length} brackets. Round of 32 shows the two-way split; later rounds rank every team by the share of brackets that send it that far.</span></div>`;
+  h+=`<div class="pool-roundhdr">Round of 32</div>`;
+  for(let i=0;i<16;i++){
+    const id=`R32-${i}`, fx=KOFIX[id];
+    if(!fx||!fx.home||!fx.away)continue;
+    let hc=0,ac=0;
+    ALL.forEach(p=>{ const w=p.bracket&&p.bracket.advance&&p.bracket.advance[id]; if(w===fx.home)hc++; else if(w===fx.away)ac++; });
+    const tot=hc+ac;
+    const hp=tot?Math.round(hc/tot*100):0, ap=tot?100-hp:0;
+    const res=KORES[id];
+    const realW = res ? (res.advTeam || (res.h>res.a?fx.home:res.h<res.a?fx.away:null)) : null;
+    const mark=t=> realW===t?` <span style="color:var(--green)">✓</span>`:"";
+    h+=`<div class="card" style="padding:11px 13px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:7px">
+        <span style="min-width:96px;font-size:13px;font-weight:600">${flagImg(fx.home,'sm')} ${esc(fx.home)}${mark(fx.home)}</span>
+        <div class="track" style="flex:1;height:20px"><div class="fill h" style="width:${hp}%"></div></div>
+        <span style="min-width:38px;text-align:right;font-size:13px;font-weight:700;color:#7ab6ec">${hp}%</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="min-width:96px;font-size:13px;font-weight:600">${flagImg(fx.away,'sm')} ${esc(fx.away)}${mark(fx.away)}</span>
+        <div class="track" style="flex:1;height:20px"><div class="fill a" style="width:${ap}%"></div></div>
+        <span style="min-width:38px;text-align:right;font-size:13px;font-weight:700;color:#f0a584">${ap}%</span>
+      </div>
+      ${tot===0?`<div class="mini" style="margin-top:6px">No bracket picks for this match.</div>`:(hp===100||ap===100)?`<div class="mini" style="margin-top:6px;color:var(--green)">Unanimous</div>`:(hp===50)?`<div class="mini" style="margin-top:6px;color:var(--accent-2)">Dead split</div>`:""}
+    </div>`;
+  }
+  // ===== R16 → Champion: ranked "% of brackets that send each team this far" =====
+  // tally each round across all brackets using teamsReaching; champion = F-0 winner
+  const roundTally={R16:{},QF:{},SF:{},F:{},CH:{}};
+  const roundDenom={R16:0,QF:0,SF:0,F:0,CH:0};
+  ALL.forEach(p=>{
+    const adv=(p.bracket&&p.bracket.advance)||{};
+    const reach=teamsReaching(adv);
+    ["R16","QF","SF","F"].forEach(rk=>{
+      if(reach[rk] && reach[rk].size){ roundDenom[rk]++; reach[rk].forEach(t=>{ roundTally[rk][t]=(roundTally[rk][t]||0)+1; }); }
+    });
+    const champ=(p.bracket&&p.bracket.champ)||null;
+    if(champ){ roundDenom.CH++; roundTally.CH[champ]=(roundTally.CH[champ]||0)+1; }
+  });
+  const roundMeta=[["R16","Round of 16"],["QF","Quarter-finals"],["SF","Semi-finals"],["F","Final"],["CH","Champion"]];
+  for(const [key,label] of roundMeta){
+    const tally=roundTally[key], denom=roundDenom[key];
+    const teams=Object.keys(tally).sort((a,b)=>tally[b]-tally[a]);
+    h+=`<div class="pool-roundhdr">${label}${key==="F"?" (reaching)":""}</div>`;
+    if(teams.length===0 || denom===0){ h+=`<div class="card pad mini">No bracket picks reach this round yet.</div>`; continue; }
+    h+=`<div class="card" style="padding:11px 13px;margin-bottom:10px;display:flex;flex-direction:column;gap:7px">`;
+    teams.forEach(t=>{
+      const pc=Math.round(tally[t]/denom*100);
+      h+=`<div style="display:flex;align-items:center;gap:10px">
+        <span style="min-width:110px;font-size:13px;font-weight:500">${flagImg(t,'sm')} ${esc(t)}</span>
+        <div class="track" style="flex:1;height:16px"><div class="fill h" style="width:${pc}%"></div></div>
+        <span style="min-width:36px;text-align:right;font-size:12.5px;font-weight:700;color:#7ab6ec">${pc}%</span>
+      </div>`;
+    });
+    h+=`</div>`;
+  }
+  return h;
+}
 function wireBracket(){
+  // view toggle (My bracket / Pool)
+  document.querySelectorAll("[data-brview]").forEach(b=>{
+    b.onclick=async()=>{
+      const v=b.dataset.brview;
+      if(v===BR_VIEW)return;
+      BR_VIEW=v;
+      if(v==="pool" && ALL.length===0){
+        const body=document.getElementById("bracketBody");
+        if(body) body.innerHTML=`<div class="loading">Loading the pool…</div>`;
+        try{ ALL=await fbLoadAll(); }catch(e){ ALL=[]; }
+      }
+      const body=document.getElementById("bracketBody");
+      if(body){ body.innerHTML=bracketBodyHTML(); wireBracket(); }
+    };
+  });
   const clr=document.getElementById("brClear");
   if(clr) clr.onclick=async()=>{
     BRACKET={advance:{},champ:""};
