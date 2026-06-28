@@ -187,15 +187,17 @@
   .pool-tree{display:flex;gap:8px;width:100%}
   .ps-col{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:7px}
   .ps-match{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
-  .ps-row{display:flex;align-items:center;gap:6px;padding:5px 7px;font-size:12px}
+  .ps-row{position:relative;display:flex;align-items:center;gap:6px;padding:5px 7px;font-size:12px;overflow:hidden}
   .ps-row+.ps-row{border-top:1px solid var(--line)}
+  .ps-bar{position:absolute;left:0;top:0;height:100%;z-index:0;transition:width .4s ease}
+  .ps-bar.h{background:rgba(58,139,212,.20)} .ps-bar.a{background:rgba(224,121,74,.20)}
+  .ps-row>.flag,.ps-row>.ps-code,.ps-row>.ps-pct{position:relative;z-index:1}
   .ps-row .flag{flex:0 0 auto;width:18px;height:12px}
   .ps-code{font-weight:600;letter-spacing:.02em;min-width:30px}
   .ps-pct{margin-left:auto;font-weight:700;font-variant-numeric:tabular-nums;color:var(--muted)}
-  .ps-row.lead{background:rgba(58,139,212,.10)}
-  .ps-row.lead .ps-pct{color:#7ab6ec}
+  .ps-row.lead .ps-pct{color:var(--ink)}
   .ps-row.win .ps-code{color:var(--green)}
-  .ps-row.win::after{content:"✓";color:var(--green);font-weight:700;margin-left:4px}
+  .ps-row.win::after{content:"✓";color:var(--green);font-weight:700;margin-left:4px;position:relative;z-index:1}
   .lb-groupwrap{margin-top:6px}
   .lb-grouptop{display:flex;align-items:center;justify-content:space-between;margin:14px 2px 8px}
   .lb-grouptop .gs-title{font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
@@ -1088,8 +1090,8 @@ function bracketPoolHTML(){
     const tot=hc+ac, hp=tot?Math.round(hc/tot*100):0, ap=tot?100-hp:0;
     const res=KORES[id];
     const realW = res ? (res.advTeam || (res.h>res.a?fx.home:res.h<res.a?fx.away:null)) : null;
-    const row=(team,pct,lead)=>`<div class="ps-row${realW===team?' win':''}${lead?' lead':''}">${flagImg(team,'sm')}<span class="ps-code">${esc(abbr(team))}</span><span class="ps-pct">${pct}%</span></div>`;
-    return `<div class="ps-match">${row(fx.home,hp,hp>=ap)}${row(fx.away,ap,ap>hp)}</div>`;
+    const row=(team,pct,lead,side)=>`<div class="ps-row${realW===team?' win':''}${lead?' lead':''}"><div class="ps-bar ${side}" style="width:${pct}%"></div>${flagImg(team,'sm')}<span class="ps-code">${esc(abbr(team))}</span><span class="ps-pct">${pct}%</span></div>`;
+    return `<div class="ps-match">${row(fx.home,hp,hp>=ap,'h')}${row(fx.away,ap,ap>hp,'a')}</div>`;
   };
   h+=`<div class="pool-tree-scroll"><div class="pool-tree">`;
   h+=`<div class="ps-col">`; for(let i=0;i<8;i++)h+=poolSlot(i); h+=`</div>`;
