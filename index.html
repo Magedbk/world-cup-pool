@@ -151,13 +151,18 @@
   .br-champ .lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
   /* ===== bracket tree ===== */
   .tree-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px 2px 14px}
-  .tree{display:flex;align-items:stretch;gap:10px;min-width:max-content}
-  .tree-col{display:flex;flex-direction:column;justify-content:space-around;gap:10px;min-width:150px}
-  .tree-col.r16{min-width:150px} .tree-col.qf{min-width:150px} .tree-col.sf{min-width:150px}
-  .tree-colhdr{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);text-align:center;margin-bottom:6px;font-weight:700}
-  .tree-match{border:1px solid var(--line);border-radius:9px;padding:5px;background:var(--panel)}
+  .tree{display:flex;align-items:stretch;gap:6px;width:100%}
+  .tree-col{flex:1 1 0;min-width:0;display:flex;flex-direction:column;justify-content:space-around;gap:8px}
+  .tree-col.r16,.tree-col.qf,.tree-col.sf{flex:1 1 0;min-width:0}
+  .tree-colhdr{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);text-align:center;margin-bottom:6px;font-weight:700}
+  .tree-match{border:1px solid var(--line);border-radius:8px;padding:4px;background:var(--panel);min-width:0}
   .tree-match.right .br-team{flex-direction:row-reverse;text-align:right}
-  .tree-center{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:170px;gap:10px}
+  .tree-center{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+  .tree .br-team{font-size:11px;padding:5px 5px;gap:4px;min-width:0;overflow:hidden}
+  .tree .br-team .bn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  .tree .br-team .flag{flex:0 0 auto}
+  .tree .br-team .abbr{display:none}
+  .tree .br-team .full{display:inline}
   .tree-final{border:1px solid var(--accent);border-radius:10px;padding:7px;background:rgba(0,217,163,.05);width:100%}
   .tree-final .fhdr{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);text-align:center;margin-bottom:6px;font-weight:700}
   .tree-trophy{font-size:30px;text-align:center;line-height:1}
@@ -178,6 +183,19 @@
   .fill{height:100%;border-radius:6px;transition:width .4s ease;min-width:2px}
   .fill.h{background:var(--home)} .fill.a{background:var(--away)}
   .pool-roundhdr{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:16px 2px 9px}
+  .pool-tree-scroll{overflow-x:auto}
+  .pool-tree{display:flex;gap:8px;width:100%}
+  .ps-col{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:7px}
+  .ps-match{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+  .ps-row{display:flex;align-items:center;gap:6px;padding:5px 7px;font-size:12px}
+  .ps-row+.ps-row{border-top:1px solid var(--line)}
+  .ps-row .flag{flex:0 0 auto;width:18px;height:12px}
+  .ps-code{font-weight:600;letter-spacing:.02em;min-width:30px}
+  .ps-pct{margin-left:auto;font-weight:700;font-variant-numeric:tabular-nums;color:var(--muted)}
+  .ps-row.lead{background:rgba(58,139,212,.10)}
+  .ps-row.lead .ps-pct{color:#7ab6ec}
+  .ps-row.win .ps-code{color:var(--green)}
+  .ps-row.win::after{content:"✓";color:var(--green);font-weight:700;margin-left:4px}
   .lb-groupwrap{margin-top:6px}
   .lb-grouptop{display:flex;align-items:center;justify-content:space-between;margin:14px 2px 8px}
   .lb-grouptop .gs-title{font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
@@ -205,9 +223,12 @@
     .teamcol .nm{font-size:12px}
     .stepper .val{font-size:24px;width:38px}
     .stepbtns button{width:26px}
-    .tree-col,.tree-col.r16,.tree-col.qf,.tree-col.sf{min-width:132px}
-    .tree-center{min-width:150px}
-    .br-team{font-size:11.5px;padding:6px 7px}
+    .tree-col,.tree-col.r16,.tree-col.qf,.tree-col.sf{min-width:0}
+    .tree-center{min-width:0}
+    .tree .br-team{font-size:10.5px;padding:5px 3px;gap:3px;justify-content:center}
+    .tree .br-team .full{display:none}
+    .tree .br-team .abbr{display:inline}
+    .tree .flag.sm{width:16px;height:11px}
     /* leaderboard: tighten padding, shrink number columns, keep Total prominent */
     .card.pad{padding:16px}
     table.lb th,table.lb td{padding:10px 6px;font-size:13px}
@@ -299,6 +320,22 @@ const CODE = {
   "Ghana":"gh","Panama":"pa","England":"gb-eng","Croatia":"hr"
 };
 function flagURL(t){const c=CODE[t];return c?`https://flagcdn.com/w80/${c}.png`:"";}
+/* FIFA-style 3-letter codes for compact bracket views */
+const ABBR={
+  "Mexico":"MEX","South Africa":"RSA","South Korea":"KOR","Czechia":"CZE",
+  "Canada":"CAN","Bosnia & Herzegovina":"BIH","Qatar":"QAT","Switzerland":"SUI",
+  "Brazil":"BRA","Morocco":"MAR","Haiti":"HAI","Scotland":"SCO",
+  "United States":"USA","Paraguay":"PAR","Australia":"AUS","Türkiye":"TUR",
+  "Ivory Coast":"CIV","Ecuador":"ECU","Germany":"GER","Curaçao":"CUW",
+  "Netherlands":"NED","Japan":"JPN","Sweden":"SWE","Tunisia":"TUN",
+  "Iran":"IRN","New Zealand":"NZL","Belgium":"BEL","Egypt":"EGY",
+  "Saudi Arabia":"KSA","Uruguay":"URU","Spain":"ESP","Cape Verde":"CPV",
+  "France":"FRA","Senegal":"SEN","Iraq":"IRQ","Norway":"NOR",
+  "Argentina":"ARG","Algeria":"ALG","Austria":"AUT","Jordan":"JOR",
+  "Portugal":"POR","DR Congo":"COD","Uzbekistan":"UZB","Colombia":"COL",
+  "Ghana":"GHA","Panama":"PAN","England":"ENG","Croatia":"CRO"
+};
+function abbr(t){ return ABBR[t] || (t||"").slice(0,3).toUpperCase(); }
 function flagImg(t,cls){
   const u=flagURL(t),ab=(CODE[t]||"??").replace("gb-","").toUpperCase();
   return `<img class="flag ${cls||''}" src="${u}" alt="${esc(t)}" loading="lazy"
@@ -957,7 +994,7 @@ function bracketBodyHTML(){
   }
   const picksMade = Object.keys(BRACKET.advance||{}).length || BRACKET.champ;
   h+=`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
-    <div class="tree-hint" style="margin:0;text-align:left">← scroll sideways to see the full bracket →</div>
+    <div class="tree-hint" style="margin:0;text-align:left">Tap a team to advance them →</div>
     ${(!lk && picksMade)?`<button class="btn ghost sm" id="brClear">Clear bracket</button>`:""}
   </div>`;
   const col=(rkey,label,idxs,side)=>{
@@ -1000,7 +1037,7 @@ function bracketTeamBtnHTML(id,team,lk){
     const realWinner = res.advTeam || (res.h>res.a?(KOFIX[id]||{}).home:res.h<res.a?(KOFIX[id]||{}).away:null);
     if(realWinner){ cls += (team===realWinner)?" correct":" wrong"; }
   }
-  return `<button class="${cls}" data-brpick="${id}" data-brteam="${esc(team)}" ${lk?"disabled":""}>${flagImg(team,'sm')}<span>${esc(team)}</span></button>`;
+  return `<button class="${cls}" data-brpick="${id}" data-brteam="${esc(team)}" ${lk?"disabled":""}>${flagImg(team,'sm')}<span class="bn full">${esc(team)}</span><span class="bn abbr">${esc(abbr(team))}</span></button>`;
 }
 function bracketFinalHTML(lk){
   const finalists=bracketPairFor("F",0);
@@ -1013,7 +1050,7 @@ function bracketFinalHTML(lk){
     let cls="br-team"+(chosen?" sel":"");
     const champReal=(KORES["F-0"]&&KORES["F-0"].advTeam)|| (KORES["F-0"]&&KORES["F-0"].h!=null?(KORES["F-0"].h>KORES["F-0"].a?(KOFIX["F-0"]||{}).home:(KOFIX["F-0"]||{}).away):null);
     if(champReal&&chosen)cls+=(team===champReal)?" correct":" wrong";
-    h+=`<button class="${cls}" data-brchamp data-brteam="${esc(team)}" ${lk?"disabled":""}>${flagImg(team,'sm')}<span>${esc(team)}</span></button>`;
+    h+=`<button class="${cls}" data-brchamp data-brteam="${esc(team)}" ${lk?"disabled":""}>${flagImg(team,'sm')}<span class="bn full">${esc(team)}</span><span class="bn abbr">${esc(abbr(team))}</span></button>`;
   });
   h+=`</div>`;
   // champion display
@@ -1041,31 +1078,23 @@ function bracketPoolHTML(){
     return `<div class="card pad empty"><div class="big">🗳️</div>No brackets in the pool yet.</div>`;
   }
   let h=`<div class="banner ok"><span>📊</span><span>How the whole pool sees the tournament — anonymous, from all ${ALL.length} brackets. Round of 32 shows the two-way split; later rounds rank every team by the share of brackets that send it that far.</span></div>`;
-  h+=`<div class="pool-roundhdr">Round of 32</div>`;
-  for(let i=0;i<16;i++){
+  h+=`<div class="pool-roundhdr">Round of 32 — pool split</div>`;
+  // compact bracket-shaped R32: left = slots 0-7, right = slots 8-15
+  const poolSlot=(i)=>{
     const id=`R32-${i}`, fx=KOFIX[id];
-    if(!fx||!fx.home||!fx.away)continue;
+    if(!fx||!fx.home||!fx.away)return "";
     let hc=0,ac=0;
     ALL.forEach(p=>{ const w=p.bracket&&p.bracket.advance&&p.bracket.advance[id]; if(w===fx.home)hc++; else if(w===fx.away)ac++; });
-    const tot=hc+ac;
-    const hp=tot?Math.round(hc/tot*100):0, ap=tot?100-hp:0;
+    const tot=hc+ac, hp=tot?Math.round(hc/tot*100):0, ap=tot?100-hp:0;
     const res=KORES[id];
     const realW = res ? (res.advTeam || (res.h>res.a?fx.home:res.h<res.a?fx.away:null)) : null;
-    const mark=t=> realW===t?` <span style="color:var(--green)">✓</span>`:"";
-    h+=`<div class="card" style="padding:11px 13px;margin-bottom:8px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:7px">
-        <span style="min-width:96px;font-size:13px;font-weight:600">${flagImg(fx.home,'sm')} ${esc(fx.home)}${mark(fx.home)}</span>
-        <div class="track" style="flex:1;height:20px"><div class="fill h" style="width:${hp}%"></div></div>
-        <span style="min-width:38px;text-align:right;font-size:13px;font-weight:700;color:#7ab6ec">${hp}%</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:10px">
-        <span style="min-width:96px;font-size:13px;font-weight:600">${flagImg(fx.away,'sm')} ${esc(fx.away)}${mark(fx.away)}</span>
-        <div class="track" style="flex:1;height:20px"><div class="fill a" style="width:${ap}%"></div></div>
-        <span style="min-width:38px;text-align:right;font-size:13px;font-weight:700;color:#f0a584">${ap}%</span>
-      </div>
-      ${tot===0?`<div class="mini" style="margin-top:6px">No bracket picks for this match.</div>`:(hp===100||ap===100)?`<div class="mini" style="margin-top:6px;color:var(--green)">Unanimous</div>`:(hp===50)?`<div class="mini" style="margin-top:6px;color:var(--accent-2)">Dead split</div>`:""}
-    </div>`;
-  }
+    const row=(team,pct,lead)=>`<div class="ps-row${realW===team?' win':''}${lead?' lead':''}">${flagImg(team,'sm')}<span class="ps-code">${esc(abbr(team))}</span><span class="ps-pct">${pct}%</span></div>`;
+    return `<div class="ps-match">${row(fx.home,hp,hp>=ap)}${row(fx.away,ap,ap>hp)}</div>`;
+  };
+  h+=`<div class="pool-tree-scroll"><div class="pool-tree">`;
+  h+=`<div class="ps-col">`; for(let i=0;i<8;i++)h+=poolSlot(i); h+=`</div>`;
+  h+=`<div class="ps-col">`; for(let i=8;i<16;i++)h+=poolSlot(i); h+=`</div>`;
+  h+=`</div></div>`;
   // ===== R16 → Champion: ranked "% of brackets that send each team this far" =====
   // tally each round across all brackets using teamsReaching; champion = F-0 winner
   const roundTally={R16:{},QF:{},SF:{},F:{},CH:{}};
