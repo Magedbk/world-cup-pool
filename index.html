@@ -1150,6 +1150,13 @@ function assignSuperlatives(statsArr){
   return titles;
 }
 /* scan ALL of a player's picks and emit scored candidate insights; higher score shown first */
+/* seeded shuffle: stable per seed (so a player's card order doesn't flicker on re-render, but differs between players) */
+function seededShuffle(arr,seed){
+  let s=0; for(const c of String(seed))s=(s*31+c.charCodeAt(0))>>>0;
+  const a=[...arr];
+  for(let i=a.length-1;i>0;i--){ s=(s*1103515245+12345)>>>0; const j=s%(i+1); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
 function detectInsights(pl,cons,rmap){
   const allRes=Object.assign({},RESULTS,KORES);
   const ids=Object.keys(allRes).filter(id=>{const p=/-/.test(id)?pl.koPicks?.[id]:pl.picks?.[id];return !!p;});
@@ -1158,8 +1165,8 @@ function detectInsights(pl,cons,rmap){
   const ins=[];
   if(played<5) return [{score:99,icon:"⏳",text:`لسه بدري نحكم — ${played} ماتش بس. (too few graded yet.)`}];
 
-  let exact=0,correct=0,pts=0,almost=0,gp=0,ga=0;
-  const scoreUse={}, teamBack={};
+  let exact=0,correct=0,pts=0,almost=0,gp=0,ga=0,contrarianTries=0;
+  const scoreUse={}, teamBack={}, teamMiss={}, byDay={};
   let best=null,worst=null,boldest=null;
   ids.forEach(id=>{
     const p=pk(id),r=allRes[id],t=gradeOf(p,r,id);
@@ -1169,11 +1176,16 @@ function detectInsights(pl,cons,rmap){
     const tot=Math.abs(p.h-r.h)+Math.abs(p.a-r.a);
     if(t>=2&&t<5&&tot===1)almost++;
     const m=matchTeams(id), po=outcomeOf(p);
-    [["H",m.home],["A",m.away]].forEach(([side,team])=>{ if(!team||team==="?")return; if(po===side){teamBack[team]=teamBack[team]||{n:0,hit:0};teamBack[team].n++;if(t>=2)teamBack[team].hit++;} });
+    [["H",m.home],["A",m.away]].forEach(([side,team])=>{ if(!team||team==="?")return;
+      if(po===side){teamBack[team]=teamBack[team]||{n:0,hit:0};teamBack[team].n++;if(t>=2)teamBack[team].hit++;}
+      teamMiss[team]=teamMiss[team]||{n:0,wrong:0};teamMiss[team].n++;if(t===0)teamMiss[team].wrong++;
+    });
+    const day = /-/.test(id)? id.split("-")[0] : id[0];
+    byDay[day]=byDay[day]||{n:0,pts:0,allExact:true}; byDay[day].n++; byDay[day].pts+=t; if(!(p.h===r.h&&p.a===r.a))byDay[day].allExact=false;
     if(best===null||t>best.t)best={t,id};
     if(worst===null||t<worst.t)worst={t,id};
     const c=cons[id];
-    if(c&&c.total>=3&&po!==c.top){const against=c.tally[c.top]/c.total;if(boldest===null||against>boldest.against)boldest={against,id,t};}
+    if(c&&c.total>=3&&po!==c.top){contrarianTries++;const against=c.tally[c.top]/c.total;if(boldest===null||against>boldest.against)boldest={against,id,t};}
   });
   const ppg=pts/played;
 
@@ -1182,38 +1194,55 @@ function detectInsights(pl,cons,rmap){
     if(t>=2 && rmap[id] && rmap[id].length===1 && rmap[id][0]===pl.name) loneWolf.push(id);
   });
   if(loneWolf.length===1){
-    ins.push({score:95,mid:loneWolf[0],icon:"🐺",text:`<b>ذئب وحيد:</b> انت الوحيد في الشلة اللي ظبط ${pickLabel(loneWolf[0],pk(loneWolf[0]))}. كلهم غلط وانت صح. أسطورة! 🔥`});
+    ins.push({tier:1,score:95,mid:loneWolf[0],icon:"🐺",text:`<b>ذئب وحيد:</b> انت الوحيد في الشلة اللي ظبط ${pickLabel(loneWolf[0],pk(loneWolf[0]))}. كلهم غلط وانت صح. أسطورة! 🔥`});
   } else if(loneWolf.length>=2){
     const names=loneWolf.slice(0,2).map(id=>matchTeams(id).home+" ضد "+matchTeams(id).away).join(" و");
-    ins.push({score:97,icon:"🐺",text:`<b>ذئب الشلة:</b> ظبطت ${loneWolf.length} ماتشات لوحدك مفيش حد غيرك عرفها (زي ${names}). عرّاف! 🔮🔥`});
+    ins.push({tier:1,score:97,icon:"🐺",text:`<b>ذئب الشلة:</b> ظبطت ${loneWolf.length} ماتشات لوحدك مفيش حد غيرك عرفها (زي ${names}). عرّاف! 🔮🔥`});
   }
-  for(const team in teamBack){const tb=teamBack[team];
-    if(tb.n>=4 && tb.hit<=tb.n*0.34) ins.push({score:90,icon:"💔",text:`<b>إدمان ${esc(team)}:</b> راهنت عليهم ${tb.n} مرات وخذلوك ${tb.n-tb.hit}. الحب أعمى يا صاحبي. 🥲`});
-    else if(tb.n>=4 && tb.hit===tb.n) ins.push({score:82,icon:"❤️‍🔥",text:`<b>عاشق ${esc(team)}:</b> راهنت عليهم ${tb.n} مرات وكسبت كلها. تعرفهم من جوه. 👏`});
+  // nemesis team (always wrong) — keep only the worst one
+  let nemesis=null;
+  for(const tm in teamMiss){const x=teamMiss[tm];if(x.n>=3&&x.wrong>=Math.max(3,x.n*0.75)){ if(!nemesis||x.wrong>nemesis.wrong)nemesis={tm,...x}; }}
+  if(nemesis) ins.push({tier:2,score:70,icon:"😤",text:`<b>${nemesis.tm} عقدتك:</b> ماتشاتهم بتغلط فيها على طول (${nemesis.wrong} من ${nemesis.n}). سيبهم وشوف غيرهم. 🙄`});
+  // team addiction / love — keep only the most extreme of each kind
+  let worstLove=null,bestLove=null;
+  for(const tm in teamBack){const tb=teamBack[tm];
+    if(tb.n>=4&&tb.hit<=tb.n*0.34){ if(!worstLove||(tb.n-tb.hit)>(worstLove.n-worstLove.hit))worstLove={tm,...tb}; }
+    else if(tb.n>=4&&tb.hit===tb.n){ if(!bestLove||tb.n>bestLove.n)bestLove={tm,...tb}; }
   }
+  if(worstLove) ins.push({tier:1,score:90,icon:"💔",text:`<b>إدمان ${worstLove.tm}:</b> راهنت عليهم ${worstLove.n} مرات وخذلوك ${worstLove.n-worstLove.hit}. الحب أعمى يا صاحبي. 🥲`});
+  if(bestLove) ins.push({tier:1,score:82,icon:"❤️‍🔥",text:`<b>عاشق ${bestLove.tm}:</b> راهنت عليهم ${bestLove.n} مرات وكسبت كلها. تعرفهم من جوه. 👏`});
+  // scoreline obsession
   let topScore=null,tc=0;for(const k in scoreUse)if(scoreUse[k]>tc){tc=scoreUse[k];topScore=k;}
-  if(tc>=Math.max(4,played*0.3)) ins.push({score:78,icon:"📋",text:`<b>عندك سكور واحد بس؟</b> توقعت ${topScore} في ${tc} ماتشات مختلفة. خلّي عندك تشكيلة يا معلم. 😂`});
-  if(boldest && boldest.t>=2){ ins.push({score:72,mid:boldest.id,icon:"🦅",text:`<b>ضد التيار:</b> لما ${Math.round(boldest.against*100)}% من الشلة راحوا عكسك، قلت ${pickLabel(boldest.id,pk(boldest.id))} وكسبت. وحش! 🔥`}); }
-  if(almost>=3) ins.push({score:65,icon:"😩",text:`<b>قصة حظ:</b> ${almost} مرات كنت فاضلك جون واحد بس على النتيجة بالظبط. الحظ بيكرهك. 💔`});
+  if(tc>=Math.max(4,played*0.3)) ins.push({tier:1,score:78,icon:"📋",text:`<b>عندك سكور واحد بس؟</b> توقعت ${topScore} في ${tc} ماتشات مختلفة. خلّي عندك تشكيلة يا معلم. 😂`});
+  // perfect matchday — keep only one
+  let perfectDay=null;
+  for(const d in byDay){const x=byDay[d];if(x.n>=3&&x.pts===x.n*5){perfectDay=d;break;}}
+  if(perfectDay) ins.push({tier:2,score:74,icon:"🏆",text:`<b>يوم مثالي:</b> في مجموعة ${perfectDay} ظبطت كل الماتشات بالنتيجة. يومك كان نار. 🔥`});
+  if(boldest && boldest.t>=2){ ins.push({tier:2,score:72,mid:boldest.id,icon:"🦅",text:`<b>ضد التيار:</b> لما ${Math.round(boldest.against*100)}% من الشلة راحوا عكسك، قلت ${pickLabel(boldest.id,pk(boldest.id))} وكسبت. وحش! 🔥`}); }
+  if(contrarianTries<=played*0.1) ins.push({tier:3,score:48,icon:"🐑",text:`<b>مع القطيع:</b> نادراً ما بتخالف رأي الشلة. آمن... بس ممل شوية. 😴`});
+  else if(contrarianTries>=played*0.5) ins.push({tier:3,score:50,icon:"🎭",text:`<b>روح ثورية:</b> نص توقعاتك عكس الشلة. مستقل برأيك يا فيلسوف. 🧠`});
+  if(almost>=3) ins.push({tier:2,score:65,icon:"😩",text:`<b>قصة حظ:</b> ${almost} مرات كنت فاضلك جون واحد بس على النتيجة بالظبط. الحظ بيكرهك. 💔`});
   const dg=(gp-ga)/played;
-  if(dg>=1.2) ins.push({score:60,icon:"💣",text:`<b>مهرجان أهداف وهمي:</b> توقعت ${(gp/played).toFixed(1)} جون/ماتش والواقع ${(ga/played).toFixed(1)}. بتلعب فيفا مش بطولة. 🎮`});
-  else if(dg<=-1.2) ins.push({score:60,icon:"🧱",text:`<b>بتلعبها دفاع:</b> توقعاتك أقل من الواقع (${(gp/played).toFixed(1)} مقابل ${(ga/played).toFixed(1)}). فك الحديد شوية! 🔒`});
-  if(best&&best.t===5) ins.push({score:50,mid:best.id,icon:"⭐",text:`<b>توقع العمر:</b> ${pickLabel(best.id,pk(best.id))} وطلعت بالظبط. مظبوطة بالمللي! 🎯`});
-  if(worst&&worst.t===0){const r=allRes[worst.id];ins.push({score:45,mid:worst.id,icon:"💀",text:`<b>أوحش غلطة:</b> قلت ${pickLabel(worst.id,pk(worst.id))} وطلعت ${r.h}–${r.a}. روح ذاكر. 📚`});}
-  if(boldest && boldest.t===0){ ins.push({score:40,mid:boldest.id,icon:"🎲",text:`<b>مقامر:</b> راهنت عكس ${Math.round(boldest.against*100)}% من الشلة في ${pickLabel(boldest.id,pk(boldest.id))} — وطارت. 😅`}); }
-  ins.push({score:10,icon:"📊",text:`<b>إجمالي:</b> ${Math.round(correct/played*100)}% صح، ${exact} مظبوطة، ${ppg.toFixed(1)} نقطة/ماتش.`});
+  if(dg>=1.2) ins.push({tier:2,score:60,icon:"💣",text:`<b>مهرجان أهداف وهمي:</b> توقعت ${(gp/played).toFixed(1)} جون/ماتش والواقع ${(ga/played).toFixed(1)}. بتلعب فيفا مش بطولة. 🎮`});
+  else if(dg<=-1.2) ins.push({tier:2,score:60,icon:"🧱",text:`<b>بتلعبها دفاع:</b> توقعاتك أقل من الواقع (${(gp/played).toFixed(1)} مقابل ${(ga/played).toFixed(1)}). فك الحديد شوية! 🔒`});
+  if(best&&best.t===5) ins.push({tier:2,score:55,mid:best.id,icon:"⭐",text:`<b>توقع العمر:</b> ${pickLabel(best.id,pk(best.id))} وطلعت بالظبط. مظبوطة بالمللي! 🎯`});
+  if(worst&&worst.t===0){const r=allRes[worst.id];ins.push({tier:3,score:45,mid:worst.id,icon:"💀",text:`<b>أوحش غلطة:</b> قلت ${pickLabel(worst.id,pk(worst.id))} وطلعت ${r.h}–${r.a}. روح ذاكر. 📚`});}
+  if(boldest && boldest.t===0){ ins.push({tier:3,score:40,mid:boldest.id,icon:"🎲",text:`<b>مقامر:</b> راهنت عكس ${Math.round(boldest.against*100)}% من الشلة في ${pickLabel(boldest.id,pk(boldest.id))} — وطارت. 😅`}); }
+  ins.push({tier:4,score:10,icon:"📊",text:`<b>إجمالي:</b> ${Math.round(correct/played*100)}% صح، ${exact} مظبوطة، ${ppg.toFixed(1)} نقطة/ماتش.`});
   return ins;
 }
-/* build the final card: title + top-N insights, de-duplicated by match */
+/* build the final card: title + tiered-shuffled insights, de-duplicated by match, capped */
 function perfCard(pl, title, cons, rmap){
   if(!pl) return [{icon:"⏳",text:"لسه مفيش توقعات. (Not enough graded picks yet.)"}];
   let ins=detectInsights(pl,cons,rmap);
-  ins.sort((a,b)=>b.score-a.score);
+  // group by tier, shuffle within each tier (seeded by name+tier), then concat tiers in order
+  const byTier={};
+  ins.forEach(i=>{ const t=(i.tier==null?4:i.tier); (byTier[t]=byTier[t]||[]).push(i); });
+  let ordered=[];
+  Object.keys(byTier).map(Number).sort((a,b)=>a-b).forEach(t=>{ ordered=ordered.concat(seededShuffle(byTier[t],pl.name+":"+t)); });
+  // dedup by match id, cap at 5
   const seen=new Set(); const picked=[];
-  for(const i of ins){
-    if(i.mid){ if(seen.has(i.mid))continue; seen.add(i.mid); }
-    picked.push(i); if(picked.length>=4)break;
-  }
+  for(const i of ordered){ if(i.mid){ if(seen.has(i.mid))continue; seen.add(i.mid); } picked.push(i); if(picked.length>=5)break; }
   const out=[];
   if(title) out.push({icon:title.split(" ")[0], text:`<b>${title.split(" ").slice(1).join(" ")}</b>`});
   return out.concat(picked);
