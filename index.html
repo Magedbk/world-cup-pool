@@ -172,6 +172,13 @@
   .gw-chip{font-size:11px;padding:3px 9px;border-radius:6px;margin-left:8px;font-weight:700}
   .gw-chip.hit{background:rgba(29,158,117,.18);color:var(--green)}
   .gw-chip.miss{background:rgba(226,75,74,.14);color:#f0908f}
+  .lbcaret{font-size:11px;color:var(--faint);margin-left:4px}
+  .lbrow:hover{background:rgba(255,255,255,.02)}
+  .perfcell{padding:0 16px 14px!important}
+  .perfcard{background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:12px 14px;display:flex;flex-direction:column;gap:9px}
+  .perfline{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.6;direction:rtl;text-align:right}
+  .perfline .pi{flex:0 0 auto;font-size:15px}
+  .perfline b{color:var(--accent);font-weight:700}
   @media(max-width:560px){
     .teamcol .nm{font-size:12px}
     .stepper .val{font-size:24px;width:38px}
@@ -1071,6 +1078,59 @@ function tallyPlayer(p){
   const total=groupPts+koPts+brk+gld;
   return {pts:total,groupPts,koPts,brk,gld,exact,played,correct,picks:Object.keys(p.picks||{}).length};
 }
+/* ===== performance analysis (group + knockout predictions vs results) ===== */
+function outcomeOf(o){ return o.h>o.a?"H":o.h<o.a?"A":"D"; }
+function analyzePlayer(p){
+  let played=0,exact=0,correct=0,pts=0;
+  let predDraws=0,predHome=0,predAway=0;
+  let gp=0,ga=0; // goals predicted/actual on graded games
+  let best=null,worst=null;
+  const grade=(pred,res,koKey)=>{
+    const s = koKey?koScore(pred,res,koKey):scorePoints(pred,res);
+    if(s===null)return;
+    played++; pts+=s;
+    if((koKey && pred.h===res.h && pred.a===res.a) || (!koKey && s===5)) exact++;
+    if(s>= (koKey?1:2)) correct++; // any positive = right direction
+    const po=outcomeOf(pred);
+    if(po==="D")predDraws++; else if(po==="H")predHome++; else predAway++;
+    gp+=pred.h+pred.a; ga+=res.h+res.a;
+    if(best===null||s>best.s) best={s,pred,res};
+    if(worst===null||s<worst.s) worst={s,pred,res};
+  };
+  for(const id in RESULTS){ const pred=p.picks?.[id]; if(pred)grade(pred,RESULTS[id],null); }
+  for(const id in KORES){ const pred=p.koPicks?.[id]; if(pred)grade(pred,KORES[id],id.split("-")[0]); }
+  if(played===0)return null;
+  return {played,exact,correct,pts,predDraws,predHome,predAway,
+    exactRate:exact/played, correctRate:correct/played,
+    avgGP:gp/played, avgGA:ga/played, ppg:pts/played};
+}
+/* Egyptian-banter card. Returns array of {icon,text} lines. */
+function perfCard(a){
+  if(!a) return [{icon:"⏳",text:"لسه مفيش توقعات متحسبة — استنى المباريات تلعب. (Not enough graded picks yet.)"}];
+  if(a.played<5) return [{icon:"⏳",text:`لسه بدري نحكم — ${a.played} ماتش بس متحسبين. استنى شوية كمان. (Only ${a.played} graded — too few to judge yet.)`}];
+  const L=[];
+  const pct=x=>Math.round(x*100);
+  // headline / style
+  if(a.exactRate>=0.15) L.push({icon:"🎯",text:`<b>قنّاص!</b> ${pct(a.exactRate)}% نتيجة مظبوطة بالظبط — بتقرا الماتش زي الكوتش. (sniper-level exact scores.)`});
+  else if(a.correctRate>=0.6 && a.exactRate<0.08) L.push({icon:"🧠",text:`<b>اللاعب المضمون.</b> بتعرف الكسبان (${pct(a.correctRate)}%) بس نادراً النتيجة بالظبط. مضمون مش مغامر. (calls winners, not scorelines.)`});
+  else if(a.correctRate<0.4) L.push({icon:"🎲",text:`<b>المقامر.</b> ${pct(a.correctRate)}% بس صح — الحظ مش معاك النهاردة, بس لما تظبطها بتظبطها صح. (boom or bust.)`});
+  else L.push({icon:"⚽",text:`<b>لاعب متوازن.</b> ${pct(a.correctRate)}% نتايج صح و${a.exact} مظبوطة بالكامل. ثابت ومحترم. (solid all-rounder.)`});
+  // strength
+  const str=[];
+  if(a.exact>=3) str.push(`${a.exact} نتيجة مظبوطة بالظبط`);
+  if(a.correctRate>=0.55) str.push(`ممتاز في اختيار الكسبان`);
+  if(str.length) L.push({icon:"💪",text:`<b>قوتك:</b> ${str.join(" + ")}. شغل نظيف. 👏`});
+  // weakness — pick the strongest real bias
+  if(a.predDraws>=a.played*0.3) L.push({icon:"😬",text:`<b>نقطة ضعفك:</b> بتتوقّع تعادل كتير أوي (${a.predDraws} مرة). الدنيا مش كلها تعادل يا حبيبي. (too many draws.)`});
+  else if(a.avgGP-a.avgGA>=1) L.push({icon:"😬",text:`<b>نقطة ضعفك:</b> بتتوقّع مهرجان أهداف — انت قلت ${a.avgGP.toFixed(1)} جون/ماتش والواقع ${a.avgGA.toFixed(1)}. هدّي اللعب شوية. (over-predicts goals.)`});
+  else if(a.avgGA-a.avgGP>=1) L.push({icon:"😬",text:`<b>نقطة ضعفك:</b> بتلعبها دفاع — قلت ${a.avgGP.toFixed(1)} جون/ماتش وطلعت ${a.avgGA.toFixed(1)}. وسّعها شوية! (too cautious on goals.)`});
+  else if(a.predHome>=a.played*0.6) L.push({icon:"😬",text:`<b>نقطة ضعفك:</b> بتحب صاحب الأرض زيادة. مش دايماً اللي في بيته يكسب. (home-team bias.)`});
+  else L.push({icon:"😬",text:`<b>نقطة ضعفك:</b> مفيش حاجة واضحة — يمكن بس بتلعب آمن زيادة. (plays it a bit safe.)`});
+  // verdict
+  const tag = a.ppg>=2.5?"يا وحش! 🔥":a.ppg>=1.8?"تمام، كمّل كده. 👌":"الدور الجاي تعويض. 💪";
+  L.push({icon:"📋",text:`<b>الخلاصة:</b> ${a.pts} نقطة من ${a.played} ماتش (${a.ppg.toFixed(1)}/ماتش). ${tag}`});
+  return L;
+}
 function renderLeaderboard(){
   const root=$("lbRoot");if(!root)return;
   const showPicks=locked();const finals=Object.keys(RESULTS).length;
@@ -1084,9 +1144,10 @@ function renderLeaderboard(){
   rows.forEach((r,i)=>{
     const rk=i+1,gc=rk<=3?`g${rk}`:"";
     const side=r.brk+r.gld;
-    h+=`<tr class="${r.name===ME?'me':''}"><td class="rank ${gc}">${rk}</td>
-      <td class="who">${esc(r.name)}${r.name===ME?' <span style="color:var(--accent);font-weight:400">(you)</span>':''}<div class="mini">${r.exact} exact · ${r.correct}/${r.played} correct${r.gld?` · +${r.gld} awards`:""}</div></td>
-      <td class="r mini">${r.groupPts}</td><td class="r mini">${r.koPts}</td><td class="r mini">${side}</td><td class="r pts">${r.pts}</td></tr>`;
+    h+=`<tr class="lbrow ${r.name===ME?'me':''}" data-player="${esc(r.name)}"><td class="rank ${gc}">${rk}</td>
+      <td class="who"><span class="lbname">${esc(r.name)}${r.name===ME?' <span style="color:var(--accent);font-weight:400">(you)</span>':''} <span class="lbcaret" data-caret="${esc(r.name)}">▾</span></span><div class="mini">${r.exact} exact · ${r.correct}/${r.played} correct${r.gld?` · +${r.gld} awards`:""}</div></td>
+      <td class="r mini">${r.groupPts}</td><td class="r mini">${r.koPts}</td><td class="r mini">${side}</td><td class="r pts">${r.pts}</td></tr>
+      <tr class="perfrow" data-perf="${esc(r.name)}" style="display:none"><td></td><td colspan="5" class="perfcell"></td></tr>`;
   });
   h+=`</tbody></table></div>`;
   if(!showPicks){
@@ -1110,6 +1171,27 @@ function renderLeaderboard(){
     }
   }
   root.innerHTML=h;
+  // tap a row to expand its performance card
+  const byName={}; ALL.forEach(p=>byName[p.name]=p);
+  root.querySelectorAll(".lbrow").forEach(row=>{
+    row.style.cursor="pointer";
+    row.onclick=()=>{
+      const name=row.dataset.player;
+      const perf=root.querySelector(`.perfrow[data-perf="${CSS.escape(name)}"]`);
+      const caret=root.querySelector(`.lbcaret[data-caret="${CSS.escape(name)}"]`);
+      if(!perf)return;
+      const open=perf.style.display!=="none";
+      if(open){ perf.style.display="none"; if(caret)caret.textContent="▾"; return; }
+      const cell=perf.querySelector(".perfcell");
+      if(cell && !cell.dataset.filled){
+        const lines=perfCard(analyzePlayer(byName[name]||{}));
+        cell.innerHTML=`<div class="perfcard">`+lines.map(l=>`<div class="perfline"><span class="pi">${l.icon}</span><span>${l.text}</span></div>`).join("")+`</div>`;
+        cell.dataset.filled="1";
+      }
+      perf.style.display="";
+      if(caret)caret.textContent="▴";
+    };
+  });
 }
 
 /* ===== scoring rules ===== */
