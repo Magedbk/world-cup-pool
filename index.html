@@ -876,6 +876,9 @@ function wireKnockoutPens(id){
 
 /* ===== BRACKET view (left/right tree) ===== */
 function bracketHTML(){
+  return `<div id="bracketBody">${bracketBodyHTML()}</div>`;
+}
+function bracketBodyHTML(){
   const lk=bracketLocked();
   const ready=roundReady("R32");
   if(!ready) return `<div class="banner info"><span>🗺️</span><span>The bracket opens once the Round of 32 fixtures are confirmed.</span></div><div class="card pad empty"><div class="big">⏳</div>Bracket not available yet.</div>`;
@@ -886,8 +889,11 @@ function bracketHTML(){
   if(Object.keys(KORES).length){
     h+=`<div class="card pad" style="text-align:center"><div style="font-size:13px;color:var(--muted)">Your bracket score so far</div><div style="font-size:30px;font-weight:700;color:var(--gold)">${bs.total} <span style="font-size:14px;color:var(--muted)">/ 100</span></div></div>`;
   }
-  h+=`<div class="tree-hint">← scroll sideways to see the full bracket →</div>`;
-  // column builders: side "L" uses indices [from,to), side "R" likewise. R column is mirrored.
+  const picksMade = Object.keys(BRACKET.advance||{}).length || BRACKET.champ;
+  h+=`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
+    <div class="tree-hint" style="margin:0;text-align:left">← scroll sideways to see the full bracket →</div>
+    ${(!lk && picksMade)?`<button class="btn ghost sm" id="brClear">Clear bracket</button>`:""}
+  </div>`;
   const col=(rkey,label,idxs,side)=>{
     let c=`<div class="tree-col ${rkey.toLowerCase()}"><div class="tree-colhdr">${label}</div>`;
     idxs.forEach(i=>{
@@ -900,14 +906,11 @@ function bracketHTML(){
   };
   const range=(a,b)=>{const r=[];for(let i=a;i<b;i++)r.push(i);return r;};
   h+=`<div class="tree-scroll"><div class="tree">`;
-  // LEFT half (flows right): R32 0-7, R16 0-3, QF 0-1, SF 0
   h+=col("R32","R32", range(0,8), "L");
   h+=col("R16","R16", range(0,4), "L");
   h+=col("QF","QF", range(0,2), "L");
   h+=col("SF","SF", range(0,1), "L");
-  // CENTRE: final + champion
   h+=bracketFinalHTML(lk);
-  // RIGHT half (flows left): SF 1, QF 2-3, R16 4-7, R32 8-15
   h+=col("SF","SF", range(1,2), "R");
   h+=col("QF","QF", range(2,4), "R");
   h+=col("R16","R16", range(4,8), "R");
@@ -953,7 +956,24 @@ function bracketFinalHTML(lk){
   h+=`</div>`;
   return h;
 }
+function rerenderBracket(){
+  const scroller=document.querySelector("#bracketBody .tree-scroll");
+  const sx=scroller?scroller.scrollLeft:0;
+  const body=document.getElementById("bracketBody");
+  if(!body){ render(); return; }
+  body.innerHTML=bracketBodyHTML();
+  wireBracket();
+  const ns=document.querySelector("#bracketBody .tree-scroll");
+  if(ns) ns.scrollLeft=sx;
+}
 function wireBracket(){
+  const clr=document.getElementById("brClear");
+  if(clr) clr.onclick=async()=>{
+    BRACKET={advance:{},champ:""};
+    await persistFull();
+    rerenderBracket();
+    toast("Bracket cleared");
+  };
   if(bracketLocked())return;
   document.querySelectorAll("[data-brpick]").forEach(b=>{
     if(b.disabled)return;
@@ -963,12 +983,12 @@ function wireBracket(){
       BRACKET.advance[id]=team;
       pruneBracket();
       await persistFull();
-      render();
+      rerenderBracket();
     };
   });
   document.querySelectorAll("[data-brchamp]").forEach(b=>{
     if(b.disabled)return;
-    b.onclick=async()=>{ BRACKET.champ=b.dataset.brteam; await persistFull(); render(); };
+    b.onclick=async()=>{ BRACKET.champ=b.dataset.brteam; await persistFull(); rerenderBracket(); };
   });
 }
 function pruneBracket(){
