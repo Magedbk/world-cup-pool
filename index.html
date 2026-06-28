@@ -1318,6 +1318,28 @@ function renderLeaderboard(){
       }
       h+=`</div>`;
     }
+    // ===== knockout reveal: each match's picks shown once that match kicks off =====
+    const koRoundsWithFixtures = KO_ROUNDS.filter(r=>roundReady(r.key));
+    for(const r of koRoundsWithFixtures){
+      let block="";
+      for(let i=0;i<r.n;i++){
+        const id=`${r.key}-${i}`, fx=KOFIX[id];
+        if(!fx||!fx.home||!fx.away)continue;
+        if(!koMatchLocked(id))continue;   // only reveal after this match's kickoff
+        const res=KORES[id];
+        const label = r.key==="F" ? (i===0?"Final":"Third place") : `${r.name} · M${i+1}`;
+        block+=`<div class="match"><div class="meta"><span>${flagImg(fx.home,'sm')} ${esc(fx.home)} v ${esc(fx.away)} ${flagImg(fx.away,'sm')}</span><span class="dot"></span><span>${esc(label)}</span>${res?`<span class="result-chip final">FT ${res.h}–${res.a}${res.pens?` (pens: ${esc(res.advTeam||"?")})`:""}</span>`:""}</div><div style="display:flex;flex-wrap:wrap;gap:7px">`;
+        const preds=ALL.map(p=>({name:p.name,pred:p.koPicks&&p.koPicks[id]})).filter(x=>x.pred);
+        if(preds.length===0)block+=`<span class="mini">No predictions for this match.</span>`;
+        preds.forEach(x=>{
+          const pts=res?koScore(x.pred,res,r.key):null;
+          const pen=x.pred.pens?` <span style="color:var(--faint)">+ركلات${x.pred.adv?` (${esc(x.pred.adv)})`:""}</span>`:"";
+          block+=`<span style="background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:5px 10px;font-size:12px"><b style="font-weight:600">${esc(x.name)}</b> <span style="color:var(--muted)">${x.pred.h}–${x.pred.a}</span>${pen}${pts!==null?` <span class="pts-badge ${koPtsClass(pts)}">+${pts}</span>`:""}</span>`;
+        });
+        block+=`</div></div>`;
+      }
+      if(block) h+=`<div class="card"><div class="grouphdr"><span class="gname">${r.name}</span><span class="teams">×${r.mult}</span></div>${block}</div>`;
+    }
   }
   root.innerHTML=h;
   // performance cards: consensus + rightmap + superlatives, computed once
