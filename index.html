@@ -123,6 +123,39 @@
   .setupwarn h2{font-size:18px;color:#f0908f;margin-bottom:10px}
   .setupwarn p{font-size:13.5px;color:var(--muted);line-height:1.6}
   .setupwarn code{background:#1a2238;padding:2px 6px;border-radius:5px;color:var(--accent);font-size:12px}
+  .pts-8,.pts-7{background:rgba(255,210,74,.18);color:var(--gold)}
+  .pts-6{background:rgba(58,139,212,.2);color:#7ab6ec}
+  .pts-4{background:rgba(170,180,212,.16);color:var(--draw)}
+  .pts-big{background:rgba(255,210,74,.22);color:var(--gold)}
+  .pens-row{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;font-size:12px;color:var(--muted)}
+  .pens-row label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+  .pens-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+  .adv-pick{display:flex;gap:6px;justify-content:center;margin-top:8px;flex-wrap:wrap}
+  .adv-pick button{font-size:11.5px;padding:5px 11px;border-radius:7px;border:1px solid var(--line);background:var(--panel-2);color:var(--muted);cursor:pointer;font-weight:600}
+  .adv-pick button.sel{border-color:var(--accent);color:var(--accent);background:rgba(0,217,163,.1)}
+  .roundnav{display:flex;gap:5px;overflow-x:auto;padding-bottom:4px;margin-bottom:16px}
+  .roundnav button{flex:0 0 auto;border:1px solid var(--line);background:var(--panel);color:var(--muted);font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:9px;cursor:pointer;white-space:nowrap}
+  .roundnav button.on{background:var(--panel-2);color:var(--ink);border-color:var(--accent)}
+  .roundnav button .tag{font-size:9px;opacity:.7;margin-left:5px}
+  .br-round{margin-bottom:18px}
+  .br-round h3{font-size:13px;font-weight:700;color:var(--muted);margin-bottom:9px;display:flex;justify-content:space-between}
+  .br-round h3 .w{font-weight:400;font-size:11.5px}
+  .br-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:7px}
+  .br-match{border:1px solid var(--line);border-radius:9px;padding:6px;background:var(--panel)}
+  .br-team{display:block;width:100%;text-align:left;margin:2px 0;padding:7px 9px;font-size:12.5px;border-radius:7px;border:1px solid var(--line);background:transparent;cursor:pointer;color:var(--ink);display:flex;align-items:center;gap:7px}
+  .br-team.sel{background:rgba(0,217,163,.12);border-color:var(--accent);font-weight:600}
+  .br-team.correct{background:rgba(29,158,117,.18);border-color:var(--green)}
+  .br-team.wrong{opacity:.5}
+  .br-team:disabled{cursor:default}
+  .br-champ{border:1px solid var(--accent);border-radius:10px;padding:12px;text-align:center;background:rgba(0,217,163,.06);margin-top:4px}
+  .br-champ .lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+  .award-row{margin-bottom:16px}
+  .award-row label{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--ink)}
+  .award-row .desc{font-size:11.5px;color:var(--faint);margin-bottom:7px}
+  .award-row input{text-align:left;font-size:14px;padding:11px 13px}
+  .gw-chip{font-size:11px;padding:3px 9px;border-radius:6px;margin-left:8px;font-weight:700}
+  .gw-chip.hit{background:rgba(29,158,117,.18);color:var(--green)}
+  .gw-chip.miss{background:rgba(226,75,74,.14);color:#f0908f}
   @media(max-width:560px){
     .teamcol .nm{font-size:12px}
     .stepper .val{font-size:24px;width:38px}
@@ -300,13 +333,164 @@ function scorePoints(pred,res){
 }
 const PTS_CLASS=p=>p===5?"pts-5":p===3?"pts-3":p===2?"pts-2":"pts-0";
 
+/* ============================================================
+   KNOCKOUT STAGE  (added)
+   ============================================================ */
+/* Round definitions: key, label, multiplier, number of matches */
+const KO_ROUNDS = [
+  {key:"R32", name:"Round of 32",       mult:1.5, n:16},
+  {key:"R16", name:"Round of 16",       mult:2,   n:8},
+  {key:"QF",  name:"Quarter-finals",    mult:3,   n:4},
+  {key:"SF",  name:"Semi-finals",       mult:4,   n:2},
+  {key:"F",   name:"Final & 3rd place", mult:5,   n:2}
+];
+const KO_BY_KEY = Object.fromEntries(KO_ROUNDS.map(r=>[r.key,r]));
+/* A knockout match id is `${roundKey}-${index}` e.g. "R32-0".
+   KOFIX (admin-set, stored in meta/knockout) maps id -> {home,away,ko,venue}.
+   Defaults below are seeded with the confirmed/projected R32; admin edits in Results tab. */
+function emptyKoFixtures(){
+  const f={};
+  for(const r of KO_ROUNDS){ for(let i=0;i<r.n;i++){ f[`${r.key}-${i}`]={home:"",away:"",ko:"",venue:""}; } }
+  return f;
+}
+/* Seed for R32 — CONFIRMED bracket (official matchups, dates, venues).
+   Stored in the slot order that makes the bracket's later rounds connect correctly.
+   Admin can still edit any of these in Results → Knockout stage. */
+const R32_SEED = [
+  ["Germany","Paraguay","2026-06-29T20:30Z","Boston Stadium"],
+  ["France","Sweden","2026-06-30T23:00Z","New York New Jersey Stadium"],
+  ["South Africa","Canada","2026-06-28T19:00Z","Los Angeles Stadium"],
+  ["Netherlands","Morocco","2026-06-30T01:00Z","Monterrey Stadium"],
+  ["Brazil","Japan","2026-06-29T17:00Z","Houston Stadium"],
+  ["Ivory Coast","Norway","2026-06-30T17:00Z","Dallas Stadium"],
+  ["Mexico","Ecuador","2026-07-01T03:00Z","Mexico City Stadium"],
+  ["England","DR Congo","2026-07-01T16:00Z","Atlanta Stadium"],
+  ["Portugal","Croatia","2026-07-02T16:00Z","Toronto Stadium"],
+  ["Spain","Austria","2026-07-02T23:00Z","Los Angeles Stadium"],
+  ["United States","Bosnia & Herzegovina","2026-07-01T19:00Z","San Francisco Bay Area Stadium"],
+  ["Belgium","Senegal","2026-07-01T23:00Z","Seattle Stadium"],
+  ["Argentina","Cape Verde","2026-07-03T23:00Z","Miami Stadium"],
+  ["Australia","Egypt","2026-07-03T17:00Z","Dallas Stadium"],
+  ["Switzerland","Algeria","2026-07-02T20:00Z","Vancouver Stadium"],
+  ["Colombia","Ghana","2026-07-03T20:00Z","Kansas City Stadium"]
+];
+function seededKoFixtures(){
+  const f=emptyKoFixtures();
+  R32_SEED.forEach((m,i)=>{ f[`R32-${i}`]={home:m[0],away:m[1],ko:m[2],venue:m[3]}; });
+  return f;
+}
+/* Bump this whenever the seeded R32 changes. If the stored fixtures are older,
+   the app refreshes R32 from the seed (without touching later rounds the admin may have set). */
+const KOFIX_SEED_VERSION = 2;  // 2 = confirmed bracket
+
+/* base 5/3/2/0 tier reused from scorePoints, but returns tier int */
+function baseTier(pred,res){
+  if(pred.h===res.h&&pred.a===res.a)return 5;
+  const out=o=>o.h>o.a?1:o.h<o.a?-1:0;
+  if(out(pred)!==out(res))return 0;
+  if(out(res)===0)return 2;
+  if((pred.h-pred.a)===(res.h-res.a))return 3;
+  return 2;
+}
+/* knockout score. pred={h,a,pens,adv}, res={h,a,pens,advTeam}, roundKey */
+function koScore(pred,res,roundKey){
+  if(!pred||!res)return null;
+  if(res.h==null||res.a==null)return null;
+  const mult=KO_BY_KEY[roundKey].mult;
+  const tier=baseTier(pred,res);
+  let base=tier, bonus=0;
+  const isDrawRes = res.h===res.a;
+  if(isDrawRes && res.pens){
+    const exactDraw = pred.h===res.h && pred.a===res.a;
+    const predictedPens = !!pred.pens;
+    const advCorrect = pred.adv && res.advTeam && pred.adv===res.advTeam;
+    if(exactDraw && predictedPens && advCorrect){ base=5; bonus=3; }
+    else if(exactDraw && predictedPens){ base=5; bonus=0; }
+    else if(tier>=2 && predictedPens){ base=2; bonus=0; }
+    else { base=tier; bonus=0; }
+  }
+  return Math.round((base+bonus)*mult);
+}
+function koPtsClass(p){
+  if(p==null)return "";
+  if(p>=15)return "pts-big";
+  if(p>=7)return "pts-8";
+  if(p>=6)return "pts-6";
+  if(p>=4)return "pts-4";
+  if(p>=2)return "pts-2";
+  return "pts-0";
+}
+
+/* ===== BRACKET BONUS ===== */
+/* A player's bracket is stored as bracket = { advance:{koMatchId:teamName}, champ:teamName }.
+   We derive which teams they have reaching each round, then compare to reality. */
+const BRACKET_PIECE = {r16:1, qf:3, sf:5, final:10, champ:20}; // sums to 100 at perfection
+/* From an advance map, compute the set of teams reaching each round.
+   advance maps each match id to the predicted winner; a team "reaches QF" if it won its R16 match, etc. */
+function teamsReaching(advance){
+  const reach={R16:new Set(),QF:new Set(),SF:new Set(),F:new Set()};
+  for(const r of KO_ROUNDS){
+    for(let i=0;i<r.n;i++){
+      const w=advance[`${r.key}-${i}`];
+      if(!w)continue;
+      // winner of R32 match reaches R16; winner of R16 reaches QF; etc.
+      const nextIdx = {R32:"R16",R16:"QF",QF:"SF",SF:"F"}[r.key];
+      if(nextIdx) reach[nextIdx].add(w);
+    }
+  }
+  return reach;
+}
+/* actual reach derived the same way from RESULTS advance (admin-confirmed advancers). */
+function bracketScore(bracket, koResults){
+  if(!bracket||!bracket.advance)return {total:0,parts:{}};
+  const mine=teamsReaching(bracket.advance);
+  // build actual advancers from results
+  const actualAdvance={};
+  for(const r of KO_ROUNDS){
+    for(let i=0;i<r.n;i++){
+      const id=`${r.key}-${i}`, res=koResults[id];
+      if(res&&res.advTeam) actualAdvance[id]=res.advTeam;
+      else if(res&&res.h!=null&&res.a!=null&&res.h!==res.a){
+        // infer winner from score if no explicit advTeam
+        const fx=(KOFIX[id]||{}); actualAdvance[id]= res.h>res.a?fx.home:fx.away;
+      }
+    }
+  }
+  const actual=teamsReaching(actualAdvance);
+  const inter=(a,b)=>[...a].filter(x=>b.has(x)).length;
+  const parts={
+    r16: inter(mine.R16,actual.R16)*BRACKET_PIECE.r16,
+    qf:  inter(mine.QF, actual.QF )*BRACKET_PIECE.qf,
+    sf:  inter(mine.SF, actual.SF )*BRACKET_PIECE.sf,
+    final: inter(mine.F, actual.F )*BRACKET_PIECE.final,
+    champ: 0
+  };
+  // champion: F-0 winner in reality (final is F-0)
+  const actualChamp = actualAdvance["F-0"]||null;
+  if(bracket.champ && actualChamp && bracket.champ===actualChamp) parts.champ=BRACKET_PIECE.champ;
+  const total=parts.r16+parts.qf+parts.sf+parts.final+parts.champ;
+  return {total, parts};
+}
+
+/* ===== GOLDEN AWARDS ===== */
+function goldenScore(golden, goldenWinners){
+  if(!golden||!goldenWinners)return 0;
+  const norm=s=>(s||"").toLowerCase().trim();
+  let p=0;
+  if(golden.boot && goldenWinners.boot && norm(golden.boot)===norm(goldenWinners.boot)) p+=5;
+  if(golden.glove&& goldenWinners.glove&& norm(golden.glove)===norm(goldenWinners.glove)) p+=5;
+  if(golden.ball && goldenWinners.ball && norm(golden.ball)===norm(goldenWinners.ball)) p+=5;
+  return p;
+}
+
+
 /* ===== firebase data layer =====
    Documents:
      predictions/{slug}  ->  { name, picks:{matchId:{h,a}}, updated }
      meta/results        ->  { results:{matchId:{h,a}} }
 */
 async function fbSavePrediction(slug,name,picks){
-  await setDoc(doc(db,"predictions",slug),{name,picks,updated:Date.now()});
+  await setDoc(doc(db,"predictions",slug),{name,picks,updated:Date.now()},{merge:true});
 }
 async function fbLoadPrediction(slug){
   const s=await getDoc(doc(db,"predictions",slug));return s.exists()?s.data():null;
@@ -319,15 +503,50 @@ async function fbSaveResults(results){ await setDoc(doc(db,"meta","results"),{re
 async function fbLoadResults(){
   const s=await getDoc(doc(db,"meta","results"));return s.exists()?(s.data().results||{}):{};
 }
+/* knockout fixtures (admin-set) */
+async function fbSaveKoFix(fixtures){ await setDoc(doc(db,"meta","knockout"),{fixtures:{...fixtures,__ver:KOFIX_SEED_VERSION}}); }
+async function fbLoadKoFix(){
+  const s=await getDoc(doc(db,"meta","knockout"));return s.exists()?(s.data().fixtures||{}):{};
+}
+/* knockout results: stored in meta/koresults as {koMatchId:{h,a,pens,advTeam}} */
+async function fbSaveKoResults(r){ await setDoc(doc(db,"meta","koresults"),{results:r}); }
+async function fbLoadKoResults(){
+  const s=await getDoc(doc(db,"meta","koresults"));return s.exists()?(s.data().results||{}):{};
+}
+/* golden award winners (admin-set): {boot,glove,ball} */
+async function fbSaveGoldenWinners(g){ await setDoc(doc(db,"meta","golden"),g); }
+async function fbLoadGoldenWinners(){
+  const s=await getDoc(doc(db,"meta","golden"));return s.exists()?s.data():{};
+}
+/* extended player doc: adds koPicks, bracket, golden alongside existing picks */
+async function fbSavePlayerFull(slug,name,data){
+  await setDoc(doc(db,"predictions",slug),{name,...data,updated:Date.now()},{merge:true});
+}
 
 /* ===== state ===== */
 let ME=null, PICKS={}, TAB="predict", ALL=[], RESULTS={}, IS_ADMIN=false;
+/* knockout / bracket / golden state */
+let KOFIX={};          // admin-set fixtures {koMatchId:{home,away,ko,venue}}
+let KORES={};          // admin-set KO results {koMatchId:{h,a,pens,advTeam}}
+let KOPICKS={};        // my KO predictions {koMatchId:{h,a,pens,adv}}
+let BRACKET={advance:{},champ:""};  // my bracket
+let GOLDEN={boot:"",glove:"",ball:""};  // my golden picks
+let GOLDEN_WINNERS={}; // admin-set winners
+let KO_ACTIVE_ROUND="R32";  // which round tab is showing in Knockouts
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1900);}
 const nowD=()=>new Date();
 const locked=()=>nowD()>=TOURNAMENT_START;
 const matchLocked=m=>nowD()>=new Date(m.ko);
+/* knockout match locks at its own kickoff (if set); bracket+golden lock at first R32 kickoff */
+function koMatchLocked(id){ const fx=KOFIX[id]; if(!fx||!fx.ko)return false; return nowD()>=new Date(fx.ko); }
+function r32FirstKO(){
+  let earliest=null;
+  for(let i=0;i<16;i++){ const fx=KOFIX[`R32-${i}`]; if(fx&&fx.ko){ const t=new Date(fx.ko); if(!earliest||t<earliest)earliest=t; } }
+  return earliest;
+}
+function bracketLocked(){ const t=r32FirstKO(); return t? nowD()>=t : false; }
 function fmtKO(iso){return new Date(iso).toLocaleString(undefined,{weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});}
 const slug=s=>s.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"").slice(0,40);
 const LSKEY="wc26_name";
@@ -351,7 +570,26 @@ setInterval(renderCountdown,1000);renderCountdown();
   try{
     ME=localStorage.getItem(LSKEY);
     RESULTS=await fbLoadResults();
-    if(ME){const p=await fbLoadPrediction(slug(ME));PICKS=p&&p.picks?p.picks:{};}
+    KORES=await fbLoadKoResults();
+    GOLDEN_WINNERS=await fbLoadGoldenWinners();
+    const savedFix=await fbLoadKoFix();
+    const savedVer = savedFix && savedFix.__ver ? savedFix.__ver : 0;
+    if(savedFix && Object.keys(savedFix).length && savedVer>=KOFIX_SEED_VERSION){
+      KOFIX = savedFix;
+    } else {
+      // stored fixtures are stale (old projection) or absent → use the confirmed seed,
+      // but keep any later-round fixtures the admin may already have set
+      const seeded = seededKoFixtures();
+      if(savedFix){ for(const id in savedFix){ if(!id.startsWith("R32-") && id!=="__ver" && savedFix[id] && savedFix[id].home) seeded[id]=savedFix[id]; } }
+      KOFIX = seeded;
+    }
+    if(ME){
+      const p=await fbLoadPrediction(slug(ME));
+      PICKS = p&&p.picks?p.picks:{};
+      KOPICKS = p&&p.koPicks?p.koPicks:{};
+      BRACKET = p&&p.bracket?p.bracket:{advance:{},champ:""};
+      GOLDEN = p&&p.golden?p.golden:{boot:"",glove:"",ball:""};
+    }
     render();
   }catch(e){
     console.error(e);
@@ -375,11 +613,17 @@ function render(){
   if(!ME){app.innerHTML=gateHTML();wireGate();return;}
   app.innerHTML=tabsHTML()+
     (TAB==="predict"?predictHTML():
+     TAB==="knockout"?knockoutHTML():
+     TAB==="bracket"?bracketHTML():
+     TAB==="awards"?awardsHTML():
      TAB==="leaderboard"?`<div id="lbRoot"><div class="loading">Tallying…</div></div>`:
      TAB==="rules"?rulesHTML():
      `<div id="adminRoot"></div>`);
   wireTabs();
   if(TAB==="predict")wirePredict();
+  else if(TAB==="knockout")wireKnockout();
+  else if(TAB==="bracket")wireBracket();
+  else if(TAB==="awards")wireAwards();
   else if(TAB==="leaderboard")loadLeaderboard();
   else if(TAB==="admin")renderAdmin();
 }
@@ -401,14 +645,20 @@ function wireGate(){
   btn.addEventListener("click",start);
   async function start(){
     ME=inp.value.trim();localStorage.setItem(LSKEY,ME);
-    try{const p=await fbLoadPrediction(slug(ME));PICKS=p&&p.picks?p.picks:{};}catch(e){PICKS={};}
+    try{
+      const p=await fbLoadPrediction(slug(ME));
+      PICKS=p&&p.picks?p.picks:{};
+      KOPICKS=p&&p.koPicks?p.koPicks:{};
+      BRACKET=p&&p.bracket?p.bracket:{advance:{},champ:""};
+      GOLDEN=p&&p.golden?p.golden:{boot:"",glove:"",ball:""};
+    }catch(e){PICKS={};}
     TAB="predict";render();
   }
 }
 
 function tabsHTML(){
   const t=(id,label)=>`<button data-t="${id}" class="${TAB===id?"on":""}">${label}</button>`;
-  return `<div class="tabs">${t("predict","My predictions")}${t("leaderboard","Leaderboard")}${t("rules","Scoring")}${t("admin","Results")}</div>`;
+  return `<div class="tabs">${t("predict","Groups")}${t("knockout","Knockouts")}${t("bracket","Bracket")}${t("awards","Awards")}${t("leaderboard","Leaderboard")}${t("rules","Scoring")}${t("admin","Results")}</div>`;
 }
 function wireTabs(){document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{TAB=b.dataset.t;render();});}
 
@@ -481,19 +731,287 @@ function wirePredict(){
   });
 }
 
+/* ===== persistence for KO/bracket/golden ===== */
+async function persistFull(){
+  try{ await fbSavePlayerFull(slug(ME),ME,{picks:PICKS,koPicks:KOPICKS,bracket:BRACKET,golden:GOLDEN}); }
+  catch(e){ toast("Save failed — check connection"); }
+}
+
+/* ===== KNOCKOUTS view ===== */
+function roundReady(rkey){
+  const r=KO_BY_KEY[rkey];
+  for(let i=0;i<r.n;i++){ const fx=KOFIX[`${rkey}-${i}`]; if(fx&&fx.home&&fx.away)return true; }
+  return false;
+}
+function knockoutHTML(){
+  const anyReady=KO_ROUNDS.some(r=>roundReady(r.key));
+  let h=`<div class="banner info"><span>🏆</span><span>Knockouts are scored with round multipliers (R32 ×1.5 up to Final ×5). Predict the score at 90 minutes; for a draw, tick <b>penalties</b> and pick who advances. Each match locks at its kickoff.</span></div>`;
+  if(!anyReady){
+    return h+`<div class="card pad empty"><div class="big">⏳</div>The knockout bracket isn't set yet.<br>Fixtures appear here once the admin confirms them after the group stage.</div>`;
+  }
+  h+=`<div class="roundnav">`;
+  for(const r of KO_ROUNDS){
+    const ready=roundReady(r.key);
+    h+=`<button data-round="${r.key}" class="${KO_ACTIVE_ROUND===r.key?"on":""}" ${ready?"":"disabled style=opacity:.4"}>${r.name}<span class="tag">×${r.mult}</span></button>`;
+  }
+  h+=`</div>`;
+  const rkey=KO_ACTIVE_ROUND, r=KO_BY_KEY[rkey];
+  if(!roundReady(rkey)){
+    return h+`<div class="card pad empty"><div class="big">⏳</div>${r.name} fixtures aren't set yet.</div>`;
+  }
+  for(let i=0;i<r.n;i++){
+    const id=`${rkey}-${i}`, fx=KOFIX[id];
+    if(!fx||!fx.home||!fx.away)continue;
+    const p=KOPICKS[id], lk=koMatchLocked(id), res=KORES[id];
+    const pts=(res&&p)?koScore(p,res,rkey):null;
+    const isF = rkey==="F";
+    const label = isF ? (i===0?"Final":"Third-place play-off") : `${r.name} · Match ${i+1}`;
+    h+=`<div class="card"><div class="grouphdr"><span class="gname">${label}</span>${fx.ko?`<span class="teams">${esc(fmtKO(fx.ko))}</span>`:""}</div>
+      <div class="match">
+        ${res?`<div class="meta"><span class="result-chip final">FT ${res.h}–${res.a}${res.pens?` (pens: ${esc(res.advTeam||"?")})`:""}${pts!=null?` <span class="pts-badge ${koPtsClass(pts)}">+${pts}</span>`:""}</span></div>`:""}
+        <div class="scorer" data-koid="${id}">
+          <div class="teamcol home">${flagImg(fx.home,'lg')}<span class="nm">${esc(fx.home)}</span></div>
+          <div style="display:flex;gap:14px;align-items:flex-start">
+            ${koStepperHTML(id,"h",p?p.h:0,lk)}<span class="vs">–</span>${koStepperHTML(id,"a",p?p.a:0,lk)}
+          </div>
+          <div class="teamcol away"><span class="nm">${esc(fx.away)}</span>${flagImg(fx.away,'lg')}</div>
+        </div>
+        <div class="pens-area" data-pens-area="${id}">${pensAreaHTML(id,fx,p,lk)}</div>
+      </div></div>`;
+  }
+  return h;
+}
+function koStepperHTML(id,side,val,lk){
+  return `<div class="stepper" data-side="${side}">
+    <div class="val" data-koval="${id}-${side}">${val}</div>
+    <div class="stepbtns">
+      <button data-koact="dec" data-koid="${id}" data-side="${side}" ${lk?"disabled":""}>−</button>
+      <button data-koact="inc" data-koid="${id}" data-side="${side}" ${lk?"disabled":""}>+</button>
+    </div></div>`;
+}
+function pensAreaHTML(id,fx,p,lk){
+  const isDraw = p && p.h===p.a;
+  if(!isDraw) return `<div class="pickstate ${p?'':'empty'}">${p?`Your call: <b>${esc(fx.home)} ${p.h}–${p.a} ${esc(fx.away)}</b>`:"No prediction yet"}</div>`;
+  const pensOn = !!(p&&p.pens);
+  let h=`<div class="pens-row"><label><input type="checkbox" data-kopens="${id}" ${pensOn?"checked":""} ${lk?"disabled":""}> Goes to penalties</label></div>`;
+  if(pensOn){
+    h+=`<div class="adv-pick" data-koadv="${id}">
+      <button data-adv="${esc(fx.home)}" class="${p.adv===fx.home?"sel":""}" ${lk?"disabled":""}>${esc(fx.home)} advances</button>
+      <button data-adv="${esc(fx.away)}" class="${p.adv===fx.away?"sel":""}" ${lk?"disabled":""}>${esc(fx.away)} advances</button>
+    </div>`;
+  }
+  return h;
+}
+function wireKnockout(){
+  document.querySelectorAll(".roundnav button[data-round]").forEach(b=>{
+    if(b.disabled)return;
+    b.onclick=()=>{KO_ACTIVE_ROUND=b.dataset.round;render();};
+  });
+  document.querySelectorAll('.stepbtns button[data-koact]').forEach(btn=>{
+    if(btn.disabled)return;
+    btn.onclick=async()=>{
+      const id=btn.dataset.koid,side=btn.dataset.side,act=btn.dataset.koact;
+      if(koMatchLocked(id))return;
+      const cur=KOPICKS[id]||{h:0,a:0};
+      let v=Math.max(0,Math.min(20,cur[side]+(act==="inc"?1:-1)));
+      cur[side]=v; cur.h=cur.h||0; cur.a=cur.a||0;
+      if(cur.h!==cur.a){ delete cur.pens; delete cur.adv; }
+      KOPICKS[id]={...cur,[side]:v};
+      document.querySelector(`[data-koval="${id}-${side}"]`).textContent=v;
+      const fx=KOFIX[id];
+      const area=document.querySelector(`[data-pens-area="${id}"]`);
+      if(area) area.innerHTML=pensAreaHTML(id,fx,KOPICKS[id],false);
+      wireKnockoutPens(id);
+      await persistFull();
+    };
+  });
+  KO_ROUNDS.forEach(r=>{for(let i=0;i<r.n;i++)wireKnockoutPens(`${r.key}-${i}`);});
+}
+function wireKnockoutPens(id){
+  const cb=document.querySelector(`[data-kopens="${id}"]`);
+  if(cb && !cb.disabled){
+    cb.onchange=async()=>{
+      const cur=KOPICKS[id]||{h:0,a:0};
+      if(cb.checked)cur.pens=true; else {delete cur.pens; delete cur.adv;}
+      KOPICKS[id]=cur;
+      const fx=KOFIX[id], area=document.querySelector(`[data-pens-area="${id}"]`);
+      if(area) area.innerHTML=pensAreaHTML(id,fx,KOPICKS[id],false);
+      wireKnockoutPens(id);
+      await persistFull();
+    };
+  }
+  const adv=document.querySelector(`[data-koadv="${id}"]`);
+  if(adv){
+    adv.querySelectorAll("button[data-adv]").forEach(b=>{
+      if(b.disabled)return;
+      b.onclick=async()=>{
+        KOPICKS[id]=KOPICKS[id]||{h:0,a:0};
+        KOPICKS[id].adv=b.dataset.adv;
+        adv.querySelectorAll("button").forEach(x=>x.classList.remove("sel"));
+        b.classList.add("sel");
+        await persistFull();
+      };
+    });
+  }
+}
+
+/* ===== BRACKET view ===== */
+function bracketHTML(){
+  const lk=bracketLocked();
+  const ready=roundReady("R32");
+  if(!ready) return `<div class="banner info"><span>🗺️</span><span>The bracket opens once the Round of 32 fixtures are confirmed.</span></div><div class="card pad empty"><div class="big">⏳</div>Bracket not available yet.</div>`;
+  let h = lk
+    ? `<div class="banner lock"><span>🔒</span><span>The bracket locked at the Round of 32 kickoff. Below is your bracket with correct picks highlighted as results come in. A perfect bracket scores <b>100</b>.</span></div>`
+    : `<div class="banner ok"><span>🗺️</span><span>One-off side prize. Click the team you think advances in each match, all the way to the champion. Saves automatically. Locks at the Round of 32 kickoff. Perfect bracket = <b>100 pts</b>.</span></div>`;
+  const bs=bracketScore(BRACKET,KORES);
+  if(Object.keys(KORES).length){
+    h+=`<div class="card pad" style="text-align:center"><div style="font-size:13px;color:var(--muted)">Your bracket score so far</div><div style="font-size:30px;font-weight:700;color:var(--gold)">${bs.total} <span style="font-size:14px;color:var(--muted)">/ 100</span></div></div>`;
+  }
+  for(let ri=0; ri<KO_ROUNDS.length; ri++){
+    const r=KO_ROUNDS[ri];
+    if(r.key==="F"){ h+=bracketFinalHTML(lk); continue; }
+    h+=`<div class="br-round"><h3><span>${r.name}</span><span class="w">winners advance to ${KO_ROUNDS[ri+1].name}</span></h3><div class="br-grid">`;
+    for(let i=0;i<r.n;i++){
+      const id=`${r.key}-${i}`;
+      const pair=bracketPairFor(r.key,i);
+      h+=`<div class="br-match" data-brmatch="${id}">`;
+      [pair[0],pair[1]].forEach(team=>{ h+=bracketTeamBtnHTML(id,team,lk); });
+      h+=`</div>`;
+    }
+    h+=`</div></div>`;
+  }
+  return h;
+}
+function bracketPairFor(rkey,i){
+  if(rkey==="R32"){ const fx=KOFIX[`R32-${i}`]||{}; return [fx.home||"",fx.away||""]; }
+  const prev={R16:"R32",QF:"R16",SF:"QF",F:"SF"}[rkey];
+  const a=BRACKET.advance[`${prev}-${i*2}`]||"";
+  const b=BRACKET.advance[`${prev}-${i*2+1}`]||"";
+  return [a,b];
+}
+function bracketTeamBtnHTML(id,team,lk){
+  if(!team) return `<button class="br-team" disabled style="opacity:.4">—</button>`;
+  const chosen=BRACKET.advance[id]===team;
+  let cls="br-team"+(chosen?" sel":"");
+  const res=KORES[id];
+  if(res && chosen){
+    const realWinner = res.advTeam || (res.h>res.a?(KOFIX[id]||{}).home:res.h<res.a?(KOFIX[id]||{}).away:null);
+    if(realWinner){ cls += (team===realWinner)?" correct":" wrong"; }
+  }
+  return `<button class="${cls}" data-brpick="${id}" data-brteam="${esc(team)}" ${lk?"disabled":""}>${flagImg(team,'sm')}${esc(team)}</button>`;
+}
+function bracketFinalHTML(lk){
+  const finalists=bracketPairFor("F",0);
+  let h=`<div class="br-round"><h3><span>Final</span><span class="w">pick the champion</span></h3>`;
+  h+=`<div class="br-champ"><div class="lbl">Champion</div><div class="br-grid" style="grid-template-columns:1fr 1fr">`;
+  [finalists[0],finalists[1]].forEach(team=>{
+    if(!team){h+=`<button class="br-team" disabled style="opacity:.4">—</button>`;return;}
+    const chosen=BRACKET.champ===team;
+    let cls="br-team"+(chosen?" sel":"");
+    const champReal=(KORES["F-0"]&&KORES["F-0"].advTeam)|| (KORES["F-0"]&&KORES["F-0"].h!=null?(KORES["F-0"].h>KORES["F-0"].a?(KOFIX["F-0"]||{}).home:(KOFIX["F-0"]||{}).away):null);
+    if(champReal&&chosen)cls+=(team===champReal)?" correct":" wrong";
+    h+=`<button class="${cls}" data-brchamp data-brteam="${esc(team)}" ${lk?"disabled":""}>${flagImg(team,'sm')}${esc(team)}</button>`;
+  });
+  h+=`</div></div></div>`;
+  return h;
+}
+function wireBracket(){
+  if(bracketLocked())return;
+  document.querySelectorAll("[data-brpick]").forEach(b=>{
+    if(b.disabled)return;
+    b.onclick=async()=>{
+      const id=b.dataset.brpick, team=b.dataset.brteam;
+      BRACKET.advance=BRACKET.advance||{};
+      BRACKET.advance[id]=team;
+      pruneBracket();
+      await persistFull();
+      render();
+    };
+  });
+  document.querySelectorAll("[data-brchamp]").forEach(b=>{
+    if(b.disabled)return;
+    b.onclick=async()=>{ BRACKET.champ=b.dataset.brteam; await persistFull(); render(); };
+  });
+}
+function pruneBracket(){
+  for(let ri=1; ri<KO_ROUNDS.length; ri++){
+    const r=KO_ROUNDS[ri];
+    for(let i=0;i<r.n;i++){
+      const id=`${r.key}-${i}`;
+      const pair=bracketPairFor(r.key,i);
+      const w=BRACKET.advance[id];
+      if(w && w!==pair[0] && w!==pair[1]) delete BRACKET.advance[id];
+    }
+  }
+  const finals=bracketPairFor("F",0);
+  if(BRACKET.champ && BRACKET.champ!==finals[0] && BRACKET.champ!==finals[1]) BRACKET.champ="";
+}
+
+/* ===== AWARDS view ===== */
+function awardsHTML(){
+  const lk=bracketLocked();
+  const gw=GOLDEN_WINNERS||{};
+  const hasWinners=gw.boot||gw.glove||gw.ball;
+  let h = lk
+    ? `<div class="banner lock"><span>🔒</span><span>Golden award picks locked at the Round of 32 kickoff. +5 points each if you called it right.</span></div>`
+    : `<div class="banner ok"><span>🥇</span><span>Pick the tournament's top performers. Free text — type a player's name. +5 each. Locks at the Round of 32 kickoff.</span></div>`;
+  const row=(key,label,desc,val,winner)=>{
+    let chip="";
+    if(hasWinners&&winner){
+      const hit=val&&val.toLowerCase().trim()===winner.toLowerCase().trim();
+      chip=`<span class="gw-chip ${hit?'hit':'miss'}">${hit?'+5 ✓':'✗'} ${esc(winner)}</span>`;
+    }
+    return `<div class="award-row"><label>${label}${chip}</label><div class="desc">${desc}</div>
+      <input type="text" data-golden="${key}" value="${esc(val||'')}" placeholder="Player name" ${lk?"disabled":""}></div>`;
+  };
+  h+=`<div class="card pad">
+    ${row("boot","Golden Boot 🥇","Tournament top scorer",GOLDEN.boot,gw.boot)}
+    ${row("glove","Golden Glove 🧤","Best goalkeeper",GOLDEN.glove,gw.glove)}
+    ${row("ball","Golden Ball ⚽","Best player",GOLDEN.ball,gw.ball)}
+  </div>`;
+  return h;
+}
+function wireAwards(){
+  if(bracketLocked())return;
+  document.querySelectorAll("[data-golden]").forEach(inp=>{
+    inp.onchange=async()=>{ GOLDEN[inp.dataset.golden]=inp.value.trim(); await persistFull(); toast("Saved"); };
+  });
+}
+
 /* ===== leaderboard ===== */
 async function loadLeaderboard(){
-  try{ALL=await fbLoadAll();RESULTS=await fbLoadResults();}catch(e){ALL=[];}
+  try{
+    ALL=await fbLoadAll();
+    RESULTS=await fbLoadResults();
+    KORES=await fbLoadKoResults();
+    GOLDEN_WINNERS=await fbLoadGoldenWinners();
+    const fx=await fbLoadKoFix();
+    const ver=fx&&fx.__ver?fx.__ver:0;
+    if(fx&&Object.keys(fx).length&&ver>=KOFIX_SEED_VERSION){KOFIX=fx;}
+    else{const seeded=seededKoFixtures();if(fx){for(const id in fx){if(!id.startsWith("R32-")&&id!=="__ver"&&fx[id]&&fx[id].home)seeded[id]=fx[id];}}KOFIX=seeded;}
+  }catch(e){ALL=[];}
   renderLeaderboard();
 }
 function tallyPlayer(p){
   let pts=0,exact=0,played=0,correct=0;
+  // group stage
   for(const id in RESULTS){
-    const pred=p.picks[id];if(!pred)continue;
+    const pred=p.picks?.[id];if(!pred)continue;
     const s=scorePoints(pred,RESULTS[id]);if(s===null)continue;
     played++;pts+=s;if(s===5)exact++;if(s>=2)correct++;
   }
-  return {pts,exact,played,correct,picks:Object.keys(p.picks||{}).length};
+  let koPts=0;
+  for(const id in KORES){
+    const pred=p.koPicks?.[id];if(!pred)continue;
+    const rkey=id.split("-")[0];
+    const s=koScore(pred,KORES[id],rkey);if(s===null)continue;
+    koPts+=s;
+  }
+  const brk = bracketScore(p.bracket||{advance:{},champ:""},KORES).total;
+  const gld = goldenScore(p.golden||{},GOLDEN_WINNERS||{});
+  const groupPts=pts;
+  const total=groupPts+koPts+brk+gld;
+  return {pts:total,groupPts,koPts,brk,gld,exact,played,correct,picks:Object.keys(p.picks||{}).length};
 }
 function renderLeaderboard(){
   const root=$("lbRoot");if(!root)return;
@@ -504,12 +1022,13 @@ function renderLeaderboard(){
   h+=finals===0
     ? `<div class="banner info"><span>📊</span><span>${ALL.length} player${ALL.length>1?"s":""} in the pool. Points appear as soon as results are entered under <b>Results</b>. Ranked by points, then exact scores.</span></div>`
     : `<div class="banner ok"><span>🏆</span><span>${finals} match${finals>1?"es":""} scored. Ranked by points → exact scores → correct results.</span></div>`;
-  h+=`<div class="card"><table class="lb"><thead><tr><th class="rank">#</th><th>Player</th><th class="r">Exact</th><th class="r">Correct</th><th class="r">Points</th></tr></thead><tbody>`;
+  h+=`<div class="card"><table class="lb"><thead><tr><th class="rank">#</th><th>Player</th><th class="r">Group</th><th class="r">KO</th><th class="r">Brkt</th><th class="r">Total</th></tr></thead><tbody>`;
   rows.forEach((r,i)=>{
     const rk=i+1,gc=rk<=3?`g${rk}`:"";
+    const side=r.brk+r.gld;
     h+=`<tr class="${r.name===ME?'me':''}"><td class="rank ${gc}">${rk}</td>
-      <td class="who">${esc(r.name)}${r.name===ME?' <span style="color:var(--accent);font-weight:400">(you)</span>':''}<div class="mini">${r.picks}/${M.length} predicted</div></td>
-      <td class="r mini">${r.exact}</td><td class="r mini">${r.correct}/${r.played}</td><td class="r pts">${r.pts}</td></tr>`;
+      <td class="who">${esc(r.name)}${r.name===ME?' <span style="color:var(--accent);font-weight:400">(you)</span>':''}<div class="mini">${r.exact} exact · ${r.correct}/${r.played} correct${r.gld?` · +${r.gld} awards`:""}</div></td>
+      <td class="r mini">${r.groupPts}</td><td class="r mini">${r.koPts}</td><td class="r mini">${side}</td><td class="r pts">${r.pts}</td></tr>`;
   });
   h+=`</tbody></table></div>`;
   if(!showPicks){
@@ -559,6 +1078,30 @@ function rulesHTML(){
       </tbody>
     </table>
     <p class="hint">Leaderboard ties break by number of exact scores, then by correct results.</p>
+  </div>
+  <div class="card pad">
+    <h2 style="font-size:18px;font-weight:700;margin-bottom:6px">Knockout rounds</h2>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:14px">Same 5 / 3 / 2 / 0 base, multiplied by the round. You predict the score at 90 minutes.</p>
+    <table class="lb" style="border:1px solid var(--line);border-radius:11px;overflow:hidden">
+      <thead><tr><th>Round</th><th class="r">Exact</th><th class="r">Margin</th><th class="r">Result</th></tr></thead>
+      <tbody>
+        <tr><td>Round of 32 (×1.5)</td><td class="r pts">8</td><td class="r mini">5</td><td class="r mini">3</td></tr>
+        <tr><td>Round of 16 (×2)</td><td class="r pts">10</td><td class="r mini">6</td><td class="r mini">4</td></tr>
+        <tr><td>Quarter-final (×3)</td><td class="r pts">15</td><td class="r mini">9</td><td class="r mini">6</td></tr>
+        <tr><td>Semi-final (×4)</td><td class="r pts">20</td><td class="r mini">12</td><td class="r mini">8</td></tr>
+        <tr><td>Final & 3rd (×5)</td><td class="r pts">25</td><td class="r mini">15</td><td class="r mini">10</td></tr>
+      </tbody>
+    </table>
+    <h3 style="font-size:15px;font-weight:700;margin:18px 0 6px">Penalties</h3>
+    <p style="color:var(--muted);font-size:13.5px;line-height:1.6">If your predicted match is a draw, tick <b>goes to penalties</b> and choose who advances. Getting all of it right — exact draw score, the penalty call, and the correct team through — scores the exact tier <b>plus a 3-point bonus</b>, then the round multiplier. Example: a perfectly-called semi-final shootout = (5 + 3) × 4 = <b>32</b>.</p>
+  </div>
+  <div class="card pad">
+    <h2 style="font-size:18px;font-weight:700;margin-bottom:6px">Bracket bonus</h2>
+    <p style="color:var(--muted);font-size:13.5px;line-height:1.6">A one-off side prize. Fill in your full bracket once before the Round of 32 kicks off. As the real tournament unfolds you earn: <b>1</b> per correct team reaching the R16, <b>3</b> per quarter-finalist, <b>5</b> per semi-finalist, <b>10</b> per finalist, and <b>20</b> for the champion. A flawless bracket scores <b>100</b>.</p>
+  </div>
+  <div class="card pad">
+    <h2 style="font-size:18px;font-weight:700;margin-bottom:6px">Golden awards</h2>
+    <p style="color:var(--muted);font-size:13.5px;line-height:1.6">Pick the Golden Boot (top scorer), Golden Glove (best keeper) and Golden Ball (best player) before the Round of 32. <b>+5 each</b> if you're right.</p>
   </div>`;
 }
 
@@ -594,11 +1137,98 @@ function renderAdmin(){
     }
     h+=`</div>`;
   }
+  /* ===== knockout admin ===== */
+  h+=`<div class="card pad"><h2 style="font-size:16px;font-weight:700;margin-bottom:6px">Knockout stage</h2>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:6px">For each round: set the two teams + kickoff (this opens predictions and the round in the bracket), then after the match enter the score. For a draw, tick penalties and choose who advanced — that drives knockout scoring and the bracket.</p></div>`;
+  h+=`<div class="roundnav">`;
+  for(const r of KO_ROUNDS){ h+=`<button data-adminround="${r.key}" class="${KO_ACTIVE_ROUND===r.key?"on":""}">${r.name}</button>`; }
+  h+=`</div>`;
+  const ar=KO_BY_KEY[KO_ACTIVE_ROUND];
+  for(let i=0;i<ar.n;i++){
+    const id=`${ar.key}-${i}`, fx=KOFIX[id]||{home:"",away:"",ko:"",venue:""}, res=KORES[id];
+    const label = ar.key==="F" ? (i===0?"Final":"Third place") : `${ar.name} · M${i+1}`;
+    h+=`<div class="card"><div class="grouphdr"><span class="gname">${label}</span></div><div style="padding:14px 18px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <input type="text" id="kf-${id}-home" value="${esc(fx.home||'')}" placeholder="Home team" style="text-align:left">
+        <input type="text" id="kf-${id}-away" value="${esc(fx.away||'')}" placeholder="Away team" style="text-align:left">
+      </div>
+      <input type="text" id="kf-${id}-ko" value="${esc(fx.ko||'')}" placeholder="Kickoff ISO e.g. 2026-07-05T19:00Z" style="text-align:left;margin-bottom:10px">
+      <button class="btn sm" data-savefix="${id}">Save fixture</button>
+      <div style="border-top:1px solid var(--line);margin:14px 0;padding-top:14px">
+        <div class="admin-score" style="justify-content:flex-start">
+          <span class="mini" style="width:90px">Final score</span>
+          <input type="text" inputmode="numeric" maxlength="2" id="kr-${id}-h" value="${res?res.h:''}" placeholder="–">
+          <span style="color:var(--faint)">:</span>
+          <input type="text" inputmode="numeric" maxlength="2" id="kr-${id}-a" value="${res?res.a:''}" placeholder="–">
+        </div>
+        <div class="pens-row" style="justify-content:flex-start;margin-top:10px">
+          <label><input type="checkbox" id="kp-${id}" ${res&&res.pens?"checked":""}> Went to penalties</label>
+        </div>
+        <div style="margin-top:8px"><input type="text" id="ka-${id}" value="${esc(res&&res.advTeam?res.advTeam:'')}" placeholder="Team that advanced (for pens / to confirm winner)" style="text-align:left"></div>
+        <div style="margin-top:10px"><button class="btn sm" data-saveko="${id}">Save result</button>
+        ${res?`<button class="btn sm danger" data-clearko="${id}" style="margin-left:6px">Clear</button>`:""}</div>
+      </div>
+    </div></div>`;
+  }
+  /* ===== golden winners admin ===== */
+  const gw=GOLDEN_WINNERS||{};
+  h+=`<div class="card pad"><h2 style="font-size:16px;font-weight:700;margin-bottom:10px">Golden award winners</h2>
+    <div class="award-row"><label>Golden Boot</label><input type="text" id="gw-boot" value="${esc(gw.boot||'')}" placeholder="Top scorer" style="text-align:left"></div>
+    <div class="award-row"><label>Golden Glove</label><input type="text" id="gw-glove" value="${esc(gw.glove||'')}" placeholder="Best goalkeeper" style="text-align:left"></div>
+    <div class="award-row"><label>Golden Ball</label><input type="text" id="gw-ball" value="${esc(gw.ball||'')}" placeholder="Best player" style="text-align:left"></div>
+    <button class="btn sm" id="saveGolden">Save winners</button>
+    <div class="hint" style="text-align:left">Names are matched case-insensitively against each player's pick. Set these at the end of the tournament.</div>
+  </div>`;
   root.innerHTML=h;
   root.querySelectorAll("[data-save]").forEach(b=>b.onclick=()=>saveResult(b.dataset.save));
   root.querySelectorAll("[data-clear]").forEach(b=>b.onclick=()=>clearResult(b.dataset.clear));
+  root.querySelectorAll("[data-adminround]").forEach(b=>b.onclick=()=>{KO_ACTIVE_ROUND=b.dataset.adminround;renderAdmin();});
+  root.querySelectorAll("[data-savefix]").forEach(b=>b.onclick=()=>saveKoFixture(b.dataset.savefix));
+  root.querySelectorAll("[data-saveko]").forEach(b=>b.onclick=()=>saveKoResult(b.dataset.saveko));
+  root.querySelectorAll("[data-clearko]").forEach(b=>b.onclick=()=>clearKoResult(b.dataset.clearko));
+  const sg=$("saveGolden"); if(sg)sg.onclick=saveGoldenWinners;
 }
-async function loadAdminData(){try{RESULTS=await fbLoadResults();}catch(e){}renderAdmin();}
+async function loadAdminData(){
+  try{
+    RESULTS=await fbLoadResults();
+    KORES=await fbLoadKoResults();
+    GOLDEN_WINNERS=await fbLoadGoldenWinners();
+    const fx=await fbLoadKoFix();
+    const ver = fx && fx.__ver ? fx.__ver : 0;
+    if(fx && Object.keys(fx).length && ver>=KOFIX_SEED_VERSION){ KOFIX=fx; }
+    else {
+      const seeded=seededKoFixtures();
+      if(fx){ for(const id in fx){ if(!id.startsWith("R32-") && id!=="__ver" && fx[id] && fx[id].home) seeded[id]=fx[id]; } }
+      KOFIX=seeded;
+    }
+  }catch(e){}
+  renderAdmin();
+}
+async function saveKoFixture(id){
+  const home=$(`kf-${id}-home`).value.trim(), away=$(`kf-${id}-away`).value.trim(), ko=$(`kf-${id}-ko`).value.trim();
+  KOFIX[id]={home,away,ko,venue:(KOFIX[id]||{}).venue||""};
+  try{await fbSaveKoFix(KOFIX);toast("Fixture saved");}catch(e){toast("Save failed");}
+  renderAdmin();
+}
+async function saveKoResult(id){
+  const hv=parseInt($(`kr-${id}-h`).value,10),av=parseInt($(`kr-${id}-a`).value,10);
+  if(isNaN(hv)||isNaN(av)||hv<0||av<0){toast("Enter both scores");return;}
+  const pens=$(`kp-${id}`).checked, adv=$(`ka-${id}`).value.trim();
+  if(hv===av && pens && !adv){toast("Enter who advanced on penalties");return;}
+  KORES[id]={h:hv,a:av,pens,advTeam:adv||null};
+  try{await fbSaveKoResults(KORES);toast(`Saved ${hv}–${av} · points updated`);}catch(e){toast("Save failed");}
+  renderAdmin();
+}
+async function clearKoResult(id){
+  delete KORES[id];
+  try{await fbSaveKoResults(KORES);toast("Result cleared");}catch(e){toast("Save failed");}
+  renderAdmin();
+}
+async function saveGoldenWinners(){
+  GOLDEN_WINNERS={boot:$("gw-boot").value.trim(),glove:$("gw-glove").value.trim(),ball:$("gw-ball").value.trim()};
+  try{await fbSaveGoldenWinners(GOLDEN_WINNERS);toast("Winners saved · awards scored");}catch(e){toast("Save failed");}
+  renderAdmin();
+}
 async function saveResult(mid){
   const hv=parseInt($(`r-${mid}-h`).value,10),av=parseInt($(`r-${mid}-a`).value,10);
   if(isNaN(hv)||isNaN(av)||hv<0||av<0){toast("Enter both scores");return;}
