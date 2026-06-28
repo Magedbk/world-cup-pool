@@ -149,6 +149,22 @@
   .br-team:disabled{cursor:default}
   .br-champ{border:1px solid var(--accent);border-radius:10px;padding:12px;text-align:center;background:rgba(0,217,163,.06);margin-top:4px}
   .br-champ .lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+  /* ===== bracket tree ===== */
+  .tree-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px 2px 14px}
+  .tree{display:flex;align-items:stretch;gap:10px;min-width:max-content}
+  .tree-col{display:flex;flex-direction:column;justify-content:space-around;gap:10px;min-width:150px}
+  .tree-col.r16{min-width:150px} .tree-col.qf{min-width:150px} .tree-col.sf{min-width:150px}
+  .tree-colhdr{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);text-align:center;margin-bottom:6px;font-weight:700}
+  .tree-match{border:1px solid var(--line);border-radius:9px;padding:5px;background:var(--panel)}
+  .tree-match.right .br-team{flex-direction:row-reverse;text-align:right}
+  .tree-center{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:170px;gap:10px}
+  .tree-final{border:1px solid var(--accent);border-radius:10px;padding:7px;background:rgba(0,217,163,.05);width:100%}
+  .tree-final .fhdr{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);text-align:center;margin-bottom:6px;font-weight:700}
+  .tree-trophy{font-size:30px;text-align:center;line-height:1}
+  .tree-champ{border:1px dashed var(--accent);border-radius:10px;padding:10px;text-align:center;background:rgba(0,217,163,.06);width:100%}
+  .tree-champ .lbl{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:6px;font-weight:700}
+  .tree-champ .team{font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;min-height:22px}
+  .tree-hint{font-size:11px;color:var(--faint);text-align:center;margin:-4px 0 10px}
   .award-row{margin-bottom:16px}
   .award-row label{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--ink)}
   .award-row .desc{font-size:11.5px;color:var(--faint);margin-bottom:7px}
@@ -160,6 +176,9 @@
     .teamcol .nm{font-size:12px}
     .stepper .val{font-size:24px;width:38px}
     .stepbtns button{width:26px}
+    .tree-col,.tree-col.r16,.tree-col.qf,.tree-col.sf{min-width:132px}
+    .tree-center{min-width:150px}
+    .br-team{font-size:11.5px;padding:6px 7px}
   }
 </style>
 </head>
@@ -855,31 +874,45 @@ function wireKnockoutPens(id){
   }
 }
 
-/* ===== BRACKET view ===== */
+/* ===== BRACKET view (left/right tree) ===== */
 function bracketHTML(){
   const lk=bracketLocked();
   const ready=roundReady("R32");
   if(!ready) return `<div class="banner info"><span>🗺️</span><span>The bracket opens once the Round of 32 fixtures are confirmed.</span></div><div class="card pad empty"><div class="big">⏳</div>Bracket not available yet.</div>`;
   let h = lk
-    ? `<div class="banner lock"><span>🔒</span><span>The bracket locked at the Round of 32 kickoff. Below is your bracket with correct picks highlighted as results come in. A perfect bracket scores <b>100</b>.</span></div>`
-    : `<div class="banner ok"><span>🗺️</span><span>One-off side prize. Click the team you think advances in each match, all the way to the champion. Saves automatically. Locks at the Round of 32 kickoff. Perfect bracket = <b>100 pts</b>.</span></div>`;
+    ? `<div class="banner lock"><span>🔒</span><span>The bracket locked at the Round of 32 kickoff. Correct picks are highlighted as results come in. A perfect bracket scores <b>100</b>.</span></div>`
+    : `<div class="banner ok"><span>🗺️</span><span>One-off side prize. Tap the team you think advances in each match — winners flow toward the centre. Saves automatically. Locks at the Round of 32 kickoff. Perfect bracket = <b>100 pts</b>.</span></div>`;
   const bs=bracketScore(BRACKET,KORES);
   if(Object.keys(KORES).length){
     h+=`<div class="card pad" style="text-align:center"><div style="font-size:13px;color:var(--muted)">Your bracket score so far</div><div style="font-size:30px;font-weight:700;color:var(--gold)">${bs.total} <span style="font-size:14px;color:var(--muted)">/ 100</span></div></div>`;
   }
-  for(let ri=0; ri<KO_ROUNDS.length; ri++){
-    const r=KO_ROUNDS[ri];
-    if(r.key==="F"){ h+=bracketFinalHTML(lk); continue; }
-    h+=`<div class="br-round"><h3><span>${r.name}</span><span class="w">winners advance to ${KO_ROUNDS[ri+1].name}</span></h3><div class="br-grid">`;
-    for(let i=0;i<r.n;i++){
-      const id=`${r.key}-${i}`;
-      const pair=bracketPairFor(r.key,i);
-      h+=`<div class="br-match" data-brmatch="${id}">`;
-      [pair[0],pair[1]].forEach(team=>{ h+=bracketTeamBtnHTML(id,team,lk); });
-      h+=`</div>`;
-    }
-    h+=`</div></div>`;
-  }
+  h+=`<div class="tree-hint">← scroll sideways to see the full bracket →</div>`;
+  // column builders: side "L" uses indices [from,to), side "R" likewise. R column is mirrored.
+  const col=(rkey,label,idxs,side)=>{
+    let c=`<div class="tree-col ${rkey.toLowerCase()}"><div class="tree-colhdr">${label}</div>`;
+    idxs.forEach(i=>{
+      const id=`${rkey}-${i}`, pair=bracketPairFor(rkey,i);
+      c+=`<div class="tree-match ${side==='R'?'right':''}" data-brmatch="${id}">`;
+      [pair[0],pair[1]].forEach(team=>{ c+=bracketTeamBtnHTML(id,team,lk); });
+      c+=`</div>`;
+    });
+    return c+`</div>`;
+  };
+  const range=(a,b)=>{const r=[];for(let i=a;i<b;i++)r.push(i);return r;};
+  h+=`<div class="tree-scroll"><div class="tree">`;
+  // LEFT half (flows right): R32 0-7, R16 0-3, QF 0-1, SF 0
+  h+=col("R32","R32", range(0,8), "L");
+  h+=col("R16","R16", range(0,4), "L");
+  h+=col("QF","QF", range(0,2), "L");
+  h+=col("SF","SF", range(0,1), "L");
+  // CENTRE: final + champion
+  h+=bracketFinalHTML(lk);
+  // RIGHT half (flows left): SF 1, QF 2-3, R16 4-7, R32 8-15
+  h+=col("SF","SF", range(1,2), "R");
+  h+=col("QF","QF", range(2,4), "R");
+  h+=col("R16","R16", range(4,8), "R");
+  h+=col("R32","R32", range(8,16), "R");
+  h+=`</div></div>`;
   return h;
 }
 function bracketPairFor(rkey,i){
@@ -898,21 +931,26 @@ function bracketTeamBtnHTML(id,team,lk){
     const realWinner = res.advTeam || (res.h>res.a?(KOFIX[id]||{}).home:res.h<res.a?(KOFIX[id]||{}).away:null);
     if(realWinner){ cls += (team===realWinner)?" correct":" wrong"; }
   }
-  return `<button class="${cls}" data-brpick="${id}" data-brteam="${esc(team)}" ${lk?"disabled":""}>${flagImg(team,'sm')}${esc(team)}</button>`;
+  return `<button class="${cls}" data-brpick="${id}" data-brteam="${esc(team)}" ${lk?"disabled":""}>${flagImg(team,'sm')}<span>${esc(team)}</span></button>`;
 }
 function bracketFinalHTML(lk){
   const finalists=bracketPairFor("F",0);
-  let h=`<div class="br-round"><h3><span>Final</span><span class="w">pick the champion</span></h3>`;
-  h+=`<div class="br-champ"><div class="lbl">Champion</div><div class="br-grid" style="grid-template-columns:1fr 1fr">`;
+  let h=`<div class="tree-center">`;
+  h+=`<div class="tree-trophy">🏆</div>`;
+  h+=`<div class="tree-final"><div class="fhdr">Final</div>`;
   [finalists[0],finalists[1]].forEach(team=>{
     if(!team){h+=`<button class="br-team" disabled style="opacity:.4">—</button>`;return;}
     const chosen=BRACKET.champ===team;
     let cls="br-team"+(chosen?" sel":"");
     const champReal=(KORES["F-0"]&&KORES["F-0"].advTeam)|| (KORES["F-0"]&&KORES["F-0"].h!=null?(KORES["F-0"].h>KORES["F-0"].a?(KOFIX["F-0"]||{}).home:(KOFIX["F-0"]||{}).away):null);
     if(champReal&&chosen)cls+=(team===champReal)?" correct":" wrong";
-    h+=`<button class="${cls}" data-brchamp data-brteam="${esc(team)}" ${lk?"disabled":""}>${flagImg(team,'sm')}${esc(team)}</button>`;
+    h+=`<button class="${cls}" data-brchamp data-brteam="${esc(team)}" ${lk?"disabled":""}>${flagImg(team,'sm')}<span>${esc(team)}</span></button>`;
   });
-  h+=`</div></div></div>`;
+  h+=`</div>`;
+  // champion display
+  const champ=BRACKET.champ;
+  h+=`<div class="tree-champ"><div class="lbl">Your champion</div><div class="team">${champ?`${flagImg(champ,'sm')}<span>${esc(champ)}</span>`:'<span style="color:var(--faint);font-weight:400">pick the final winner</span>'}</div></div>`;
+  h+=`</div>`;
   return h;
 }
 function wireBracket(){
