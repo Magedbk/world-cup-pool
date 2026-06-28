@@ -613,6 +613,7 @@ setInterval(renderCountdown,1000);renderCountdown();
       const p=await fbLoadPrediction(slug(ME));
       PICKS = p&&p.picks?p.picks:{};
       KOPICKS = p&&p.koPicks?p.koPicks:{};
+      for(const id in KOPICKS){ const kp=KOPICKS[id]; if(kp && kp.h!==kp.a){ delete kp.pens; delete kp.adv; } }
       BRACKET = p&&p.bracket?p.bracket:{advance:{},champ:""};
       GOLDEN = p&&p.golden?p.golden:{boot:"",glove:"",ball:""};
       sanitizeBracket();   // drop any picks that don't match the current (corrected) fixtures
@@ -760,6 +761,8 @@ function wirePredict(){
 
 /* ===== persistence for KO/bracket/golden ===== */
 async function persistFull(){
+  // sanitize: a non-draw prediction must never carry penalty fields
+  for(const id in KOPICKS){ const p=KOPICKS[id]; if(p && p.h!==p.a){ delete p.pens; delete p.adv; } }
   try{ await fbSavePlayerFull(slug(ME),ME,{picks:PICKS,koPicks:KOPICKS,bracket:BRACKET,golden:GOLDEN}); }
   catch(e){ toast("Save failed — check connection"); }
 }
@@ -1333,7 +1336,8 @@ function renderLeaderboard(){
         if(preds.length===0)block+=`<span class="mini">No predictions for this match.</span>`;
         preds.forEach(x=>{
           const pts=res?koScore(x.pred,res,r.key):null;
-          const pen=x.pred.pens?` <span style="color:var(--faint)">+ركلات${x.pred.adv?` (${esc(x.pred.adv)})`:""}</span>`:"";
+          const isDraw = x.pred.h===x.pred.a;
+          const pen=(isDraw && x.pred.pens)?` <span style="color:var(--faint)">+ركلات${x.pred.adv?` (${esc(x.pred.adv)})`:""}</span>`:"";
           block+=`<span style="background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:5px 10px;font-size:12px"><b style="font-weight:600">${esc(x.name)}</b> <span style="color:var(--muted)">${x.pred.h}–${x.pred.a}</span>${pen}${pts!==null?` <span class="pts-badge ${koPtsClass(pts)}">+${pts}</span>`:""}</span>`;
         });
         block+=`</div></div>`;
