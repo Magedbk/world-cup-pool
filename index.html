@@ -1085,7 +1085,7 @@ function matchTeams(id){
   if(/^[A-L][1-6]$/.test(id)){ const m=M.find(x=>x.id===id); return m?{home:m.home,away:m.away}:{home:"?",away:"?"}; }
   const fx=KOFIX[id]||{}; return {home:fx.home||"?",away:fx.away||"?"};
 }
-function pickLabel(id,p){ const m=matchTeams(id); return `${esc(m.home)} ${p.h}–${p.a} ${esc(m.away)}`; }
+function pickLabel(id,p){ const m=matchTeams(id); return `${m.home} ${p.h}–${p.a} ${m.away}`; }
 function gradeOf(pred,res,id){ const ko=/-/.test(id); return ko?koScore(pred,res,id.split("-")[0]):scorePoints(pred,res); }
 
 /* pool consensus per graded match */
@@ -1104,79 +1104,119 @@ function buildConsensus(){
   }
   return cons;
 }
+/* map: matchId -> [names who got the outcome right] (for lone-wolf detection) */
+function buildRightMap(){
+  const rm={}; const allRes=Object.assign({},RESULTS,KORES);
+  for(const id in allRes){
+    rm[id]=[];
+    ALL.forEach(pl=>{
+      const p=/-/.test(id)?pl.koPicks?.[id]:pl.picks?.[id];
+      if(p && gradeOf(p,allRes[id],id)>= (/-/.test(id)?1:2)) rm[id].push(pl.name);
+    });
+  }
+  return rm;
+}
 function playerStats(pl,cons){
   let played=0,exact=0,correct=0,pts=0,predDraws=0,gp=0,ga=0;
-  let best=null,worst=null,boldest=null,bestStreak=0,curStreak=0,contrarianHits=0;
+  let bestStreak=0,curStreak=0,contrarianHits=0;
   const allRes=Object.assign({},RESULTS,KORES);
   for(const id in allRes){
-    const p = /-/.test(id)? pl.koPicks?.[id] : pl.picks?.[id];
+    const p=/-/.test(id)?pl.koPicks?.[id]:pl.picks?.[id];
     if(!p)continue;
-    const r=allRes[id], t=gradeOf(p,r,id);
-    if(t===null)continue;
+    const r=allRes[id], t=gradeOf(p,r,id); if(t===null)continue;
     played++; pts+=t;
-    const isExact = p.h===r.h && p.a===r.a;
-    if(isExact)exact++;
-    const positive = t >= (/-/.test(id)?1:2);
-    if(positive){correct++;curStreak++;if(curStreak>bestStreak)bestStreak=curStreak;} else curStreak=0;
+    if(p.h===r.h&&p.a===r.a)exact++;
+    const positive=t>=(/-/.test(id)?1:2);
+    if(positive){correct++;curStreak++;if(curStreak>bestStreak)bestStreak=curStreak;}else curStreak=0;
     if(outcomeOf(p)==="D")predDraws++;
     gp+=p.h+p.a; ga+=r.h+r.a;
-    if(best===null||t>best.t)best={t,id,p,r};
-    if(worst===null||t<worst.t)worst={t,id,p,r};
     const c=cons[id];
-    if(c && c.total>=3 && outcomeOf(p)!==c.top){
-      if(positive)contrarianHits++;
-      const against=c.tally[c.top]/c.total;
-      if(boldest===null||against>boldest.against)boldest={against,id,p,r,t};
-    }
+    if(c&&c.total>=3&&outcomeOf(p)!==c.top&&positive)contrarianHits++;
   }
   if(played===0)return null;
   return {name:pl.name,played,exact,correct,pts,predDraws,gp,ga,
     exactRate:exact/played,correctRate:correct/played,
-    avgGP:gp/played,avgGA:ga/played,ppg:pts/played,
-    best,worst,boldest,contrarianHits,bestStreak};
+    avgGP:gp/played,avgGA:ga/played,ppg:pts/played,contrarianHits,bestStreak};
 }
 function assignSuperlatives(statsArr){
   const titles={}; const elig=statsArr.filter(s=>s&&s.played>=5);
-  const grab=(key,title)=>{
-    const sorted=[...elig].filter(s=>!titles[s.name]&&s[key]>0).sort((a,b)=>b[key]-a[key]);
-    if(sorted.length) titles[sorted[0].name]=title;
-  };
+  const grab=(key,title)=>{ const sorted=[...elig].filter(s=>!titles[s.name]&&s[key]>0).sort((a,b)=>b[key]-a[key]); if(sorted.length)titles[sorted[0].name]=title; };
   grab("exact","🎯 صاحب أكتر نتايج مظبوطة (most exact scores)");
-  grab("contrarianHits","🦅 ملك العكس — بيكسب ضد التيار (best against the grain)");
+  grab("contrarianHits","🦅 ملك العكس (best against the grain)");
   grab("ppg","👑 الأعلى نقاط في المتوسط (best average)");
   grab("bestStreak","🔥 أطول سلسلة صح (longest hot streak)");
   grab("predDraws","🤝 عاشق التعادل (the draw whisperer)");
   grab("avgGP","💣 ملك المهرجانات (the goal-fest king)");
   return titles;
 }
-/* personalized card lines for one player */
-function perfCard(s, title){
-  if(!s) return [{icon:"⏳",text:"لسه مفيش توقعات متحسبة. (Not enough graded picks yet.)"}];
-  if(s.played<5) return [{icon:"⏳",text:`لسه بدري نحكم — ${s.played} ماتش بس متحسبين. (Only ${s.played} graded — too few yet.)`}];
-  const L=[]; const pct=x=>Math.round(x*100);
-  if(title) L.push({icon:title.split(" ")[0], text:`<b>${title.split(" ").slice(1).join(" ")}</b>`});
-  L.push({icon:"📊",text:`<b>إجمالي:</b> ${pct(s.correctRate)}% نتايج صح، ${s.exact} مظبوطة بالظبط، ${s.ppg.toFixed(1)} نقطة/ماتش. (overall accuracy.)`});
-  const quoted=new Set();
-  if(s.best && s.best.t>=3){
-    quoted.add(s.best.id);
-    L.push({icon:"⭐",text:`<b>أحلى توقع ليك:</b> ${pickLabel(s.best.id,s.best.p)} — طلعت ${s.best.r.h}–${s.best.r.a}. ${s.best.t===5?"مظبوطة بالمللي! 🎯":"قراءة حلوة. 👏"}`});
+/* scan ALL of a player's picks and emit scored candidate insights; higher score shown first */
+function detectInsights(pl,cons,rmap){
+  const allRes=Object.assign({},RESULTS,KORES);
+  const ids=Object.keys(allRes).filter(id=>{const p=/-/.test(id)?pl.koPicks?.[id]:pl.picks?.[id];return !!p;});
+  const pk=id=>/-/.test(id)?pl.koPicks[id]:pl.picks[id];
+  const played=ids.length;
+  const ins=[];
+  if(played<5) return [{score:99,icon:"⏳",text:`لسه بدري نحكم — ${played} ماتش بس. (too few graded yet.)`}];
+
+  let exact=0,correct=0,pts=0,almost=0,gp=0,ga=0;
+  const scoreUse={}, teamBack={};
+  let best=null,worst=null,boldest=null;
+  ids.forEach(id=>{
+    const p=pk(id),r=allRes[id],t=gradeOf(p,r,id);
+    pts+=t; if(p.h===r.h&&p.a===r.a)exact++; if(t>=(/-/.test(id)?1:2))correct++;
+    const k=p.h+"-"+p.a; scoreUse[k]=(scoreUse[k]||0)+1;
+    gp+=p.h+p.a; ga+=r.h+r.a;
+    const tot=Math.abs(p.h-r.h)+Math.abs(p.a-r.a);
+    if(t>=2&&t<5&&tot===1)almost++;
+    const m=matchTeams(id), po=outcomeOf(p);
+    [["H",m.home],["A",m.away]].forEach(([side,team])=>{ if(!team||team==="?")return; if(po===side){teamBack[team]=teamBack[team]||{n:0,hit:0};teamBack[team].n++;if(t>=2)teamBack[team].hit++;} });
+    if(best===null||t>best.t)best={t,id};
+    if(worst===null||t<worst.t)worst={t,id};
+    const c=cons[id];
+    if(c&&c.total>=3&&po!==c.top){const against=c.tally[c.top]/c.total;if(boldest===null||against>boldest.against)boldest={against,id,t};}
+  });
+  const ppg=pts/played;
+
+  const loneWolf=[];
+  ids.forEach(id=>{ const t=gradeOf(pk(id),allRes[id],id);
+    if(t>=2 && rmap[id] && rmap[id].length===1 && rmap[id][0]===pl.name) loneWolf.push(id);
+  });
+  if(loneWolf.length===1){
+    ins.push({score:95,mid:loneWolf[0],icon:"🐺",text:`<b>ذئب وحيد:</b> انت الوحيد في الشلة اللي ظبط ${pickLabel(loneWolf[0],pk(loneWolf[0]))}. كلهم غلط وانت صح. أسطورة! 🔥`});
+  } else if(loneWolf.length>=2){
+    const names=loneWolf.slice(0,2).map(id=>matchTeams(id).home+" ضد "+matchTeams(id).away).join(" و");
+    ins.push({score:97,icon:"🐺",text:`<b>ذئب الشلة:</b> ظبطت ${loneWolf.length} ماتشات لوحدك مفيش حد غيرك عرفها (زي ${names}). عرّاف! 🔮🔥`});
   }
-  if(s.boldest){
-    quoted.add(s.boldest.id);
-    const m=matchTeams(s.boldest.id);
-    const pickedSide = outcomeOf(s.boldest.p)==="H"?m.home: outcomeOf(s.boldest.p)==="A"?m.away:"تعادل";
-    const pc=Math.round(s.boldest.against*100);
-    if(s.boldest.t>=2) L.push({icon:"🦅",text:`<b>جرأة:</b> لما ${pc}% من الشلة راحوا عكسك، قلت ${pickLabel(s.boldest.id,s.boldest.p)} وكسبت. وحش! 🔥`});
-    else L.push({icon:"🎲",text:`<b>أجرأ توقع:</b> راهنت على ${esc(pickedSide)} عكس ${pc}% من الشلة (${pickLabel(s.boldest.id,s.boldest.p)}) — وراحت عليك. 😅`});
+  for(const team in teamBack){const tb=teamBack[team];
+    if(tb.n>=4 && tb.hit<=tb.n*0.34) ins.push({score:90,icon:"💔",text:`<b>إدمان ${esc(team)}:</b> راهنت عليهم ${tb.n} مرات وخذلوك ${tb.n-tb.hit}. الحب أعمى يا صاحبي. 🥲`});
+    else if(tb.n>=4 && tb.hit===tb.n) ins.push({score:82,icon:"❤️‍🔥",text:`<b>عاشق ${esc(team)}:</b> راهنت عليهم ${tb.n} مرات وكسبت كلها. تعرفهم من جوه. 👏`});
   }
-  if(s.worst && s.worst.t===0 && !quoted.has(s.worst.id)){
-    L.push({icon:"💀",text:`<b>أوحش غلطة:</b> ${pickLabel(s.worst.id,s.worst.p)} وطلعت ${s.worst.r.h}–${s.worst.r.a}. نسيناها. 🙈`});
+  let topScore=null,tc=0;for(const k in scoreUse)if(scoreUse[k]>tc){tc=scoreUse[k];topScore=k;}
+  if(tc>=Math.max(4,played*0.3)) ins.push({score:78,icon:"📋",text:`<b>عندك سكور واحد بس؟</b> توقعت ${topScore} في ${tc} ماتشات مختلفة. خلّي عندك تشكيلة يا معلم. 😂`});
+  if(boldest && boldest.t>=2){ ins.push({score:72,mid:boldest.id,icon:"🦅",text:`<b>ضد التيار:</b> لما ${Math.round(boldest.against*100)}% من الشلة راحوا عكسك، قلت ${pickLabel(boldest.id,pk(boldest.id))} وكسبت. وحش! 🔥`}); }
+  if(almost>=3) ins.push({score:65,icon:"😩",text:`<b>قصة حظ:</b> ${almost} مرات كنت فاضلك جون واحد بس على النتيجة بالظبط. الحظ بيكرهك. 💔`});
+  const dg=(gp-ga)/played;
+  if(dg>=1.2) ins.push({score:60,icon:"💣",text:`<b>مهرجان أهداف وهمي:</b> توقعت ${(gp/played).toFixed(1)} جون/ماتش والواقع ${(ga/played).toFixed(1)}. بتلعب فيفا مش بطولة. 🎮`});
+  else if(dg<=-1.2) ins.push({score:60,icon:"🧱",text:`<b>بتلعبها دفاع:</b> توقعاتك أقل من الواقع (${(gp/played).toFixed(1)} مقابل ${(ga/played).toFixed(1)}). فك الحديد شوية! 🔒`});
+  if(best&&best.t===5) ins.push({score:50,mid:best.id,icon:"⭐",text:`<b>توقع العمر:</b> ${pickLabel(best.id,pk(best.id))} وطلعت بالظبط. مظبوطة بالمللي! 🎯`});
+  if(worst&&worst.t===0){const r=allRes[worst.id];ins.push({score:45,mid:worst.id,icon:"💀",text:`<b>أوحش غلطة:</b> قلت ${pickLabel(worst.id,pk(worst.id))} وطلعت ${r.h}–${r.a}. روح ذاكر. 📚`});}
+  if(boldest && boldest.t===0){ ins.push({score:40,mid:boldest.id,icon:"🎲",text:`<b>مقامر:</b> راهنت عكس ${Math.round(boldest.against*100)}% من الشلة في ${pickLabel(boldest.id,pk(boldest.id))} — وطارت. 😅`}); }
+  ins.push({score:10,icon:"📊",text:`<b>إجمالي:</b> ${Math.round(correct/played*100)}% صح، ${exact} مظبوطة، ${ppg.toFixed(1)} نقطة/ماتش.`});
+  return ins;
+}
+/* build the final card: title + top-N insights, de-duplicated by match */
+function perfCard(pl, title, cons, rmap){
+  if(!pl) return [{icon:"⏳",text:"لسه مفيش توقعات. (Not enough graded picks yet.)"}];
+  let ins=detectInsights(pl,cons,rmap);
+  ins.sort((a,b)=>b.score-a.score);
+  const seen=new Set(); const picked=[];
+  for(const i of ins){
+    if(i.mid){ if(seen.has(i.mid))continue; seen.add(i.mid); }
+    picked.push(i); if(picked.length>=4)break;
   }
-  if(s.predDraws>=s.played*0.3) L.push({icon:"🤝",text:`<b>ملاحظة:</b> بتحب التعادل قوي (${s.predDraws} مرة). الدنيا مش كلها سلبي يا حبيبي.`});
-  else if(s.avgGP-s.avgGA>=1) L.push({icon:"💣",text:`<b>ملاحظة:</b> بتتوقّع أهداف أكتر من الواقع (${s.avgGP.toFixed(1)} مقابل ${s.avgGA.toFixed(1)}). هدّي اللعب شوية.`});
-  else if(s.avgGA-s.avgGP>=1) L.push({icon:"🧱",text:`<b>ملاحظة:</b> بتلعبها دفاع — قلت ${s.avgGP.toFixed(1)} جون والواقع ${s.avgGA.toFixed(1)}. وسّعها!`});
-  else if(s.bestStreak>=4) L.push({icon:"🔥",text:`<b>ملاحظة:</b> عملت سلسلة ${s.bestStreak} توقعات صح ورا بعض. نار!`});
-  return L;
+  const out=[];
+  if(title) out.push({icon:title.split(" ")[0], text:`<b>${title.split(" ").slice(1).join(" ")}</b>`});
+  return out.concat(picked);
 }
 function renderLeaderboard(){
   const root=$("lbRoot");if(!root)return;
@@ -1218,11 +1258,12 @@ function renderLeaderboard(){
     }
   }
   root.innerHTML=h;
-  // performance cards: one consensus + superlative pass for the whole pool
-  const byName={}; ALL.forEach(p=>byName[p.name]=p);
+  // performance cards: consensus + rightmap + superlatives, computed once
   const _cons=buildConsensus();
+  const _rmap=buildRightMap();
   const _statsByName={}; ALL.forEach(p=>{ _statsByName[p.name]=playerStats(p,_cons); });
   const _titles=assignSuperlatives(Object.values(_statsByName));
+  const _byName={}; ALL.forEach(p=>_byName[p.name]=p);
   root.querySelectorAll(".lbrow").forEach(row=>{
     row.style.cursor="pointer";
     row.onclick=()=>{
@@ -1234,7 +1275,7 @@ function renderLeaderboard(){
       if(open){ perf.style.display="none"; if(caret)caret.textContent="▾"; return; }
       const cell=perf.querySelector(".perfcell");
       if(cell && !cell.dataset.filled){
-        const lines=perfCard(_statsByName[name], _titles[name]);
+        const lines=perfCard(_byName[name], _titles[name], _cons, _rmap);
         cell.innerHTML=`<div class="perfcard">`+lines.map(l=>`<div class="perfline"><span class="pi">${l.icon}</span><span>${l.text}</span></div>`).join("")+`</div>`;
         cell.dataset.filled="1";
       }
