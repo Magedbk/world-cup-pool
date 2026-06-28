@@ -383,18 +383,18 @@ function emptyKoFixtures(){
    Stored in the slot order that makes the bracket's later rounds connect correctly.
    Admin can still edit any of these in Results → Knockout stage. */
 const R32_SEED = [
-  ["Germany","Paraguay","2026-06-29T20:30Z","Boston Stadium"],
-  ["France","Sweden","2026-06-30T23:00Z","New York New Jersey Stadium"],
   ["South Africa","Canada","2026-06-28T19:00Z","Los Angeles Stadium"],
   ["Netherlands","Morocco","2026-06-30T01:00Z","Monterrey Stadium"],
-  ["Brazil","Japan","2026-06-29T17:00Z","Houston Stadium"],
-  ["Ivory Coast","Norway","2026-06-30T17:00Z","Dallas Stadium"],
-  ["Mexico","Ecuador","2026-07-01T03:00Z","Mexico City Stadium"],
-  ["England","DR Congo","2026-07-01T16:00Z","Atlanta Stadium"],
+  ["Germany","Paraguay","2026-06-29T20:30Z","Boston Stadium"],
+  ["France","Sweden","2026-06-30T23:00Z","New York New Jersey Stadium"],
   ["Portugal","Croatia","2026-07-02T16:00Z","Toronto Stadium"],
   ["Spain","Austria","2026-07-02T23:00Z","Los Angeles Stadium"],
   ["United States","Bosnia & Herzegovina","2026-07-01T19:00Z","San Francisco Bay Area Stadium"],
   ["Belgium","Senegal","2026-07-01T23:00Z","Seattle Stadium"],
+  ["Brazil","Japan","2026-06-29T17:00Z","Houston Stadium"],
+  ["Ivory Coast","Norway","2026-06-30T17:00Z","Dallas Stadium"],
+  ["Mexico","Ecuador","2026-07-01T03:00Z","Mexico City Stadium"],
+  ["England","DR Congo","2026-07-01T16:00Z","Atlanta Stadium"],
   ["Argentina","Cape Verde","2026-07-03T23:00Z","Miami Stadium"],
   ["Australia","Egypt","2026-07-03T17:00Z","Dallas Stadium"],
   ["Switzerland","Algeria","2026-07-02T20:00Z","Vancouver Stadium"],
@@ -407,7 +407,7 @@ function seededKoFixtures(){
 }
 /* Bump this whenever the seeded R32 changes. If the stored fixtures are older,
    the app refreshes R32 from the seed (without touching later rounds the admin may have set). */
-const KOFIX_SEED_VERSION = 2;  // 2 = confirmed bracket
+const KOFIX_SEED_VERSION = 3;  // 3 = corrected bracket (Portugal & Argentina opposite halves)
 
 /* base 5/3/2/0 tier reused from scorePoints, but returns tier int */
 function baseTier(pred,res){
@@ -615,6 +615,7 @@ setInterval(renderCountdown,1000);renderCountdown();
       KOPICKS = p&&p.koPicks?p.koPicks:{};
       BRACKET = p&&p.bracket?p.bracket:{advance:{},champ:""};
       GOLDEN = p&&p.golden?p.golden:{boot:"",glove:"",ball:""};
+      sanitizeBracket();   // drop any picks that don't match the current (corrected) fixtures
     }
     render();
   }catch(e){
@@ -997,6 +998,27 @@ function wireBracket(){
     if(b.disabled)return;
     b.onclick=async()=>{ BRACKET.champ=b.dataset.brteam; await persistFull(); rerenderBracket(); };
   });
+}
+/* one-time validation of a loaded bracket against current fixtures:
+   walk round by round, dropping any advance pick whose team isn't in that slot's matchup.
+   Because R16+ matchups derive from earlier picks, dropping an early pick cascades correctly. */
+function sanitizeBracket(){
+  if(!BRACKET||!BRACKET.advance)return;
+  // R32: each pick must be one of the two teams actually in that fixture
+  for(let i=0;i<16;i++){
+    const id=`R32-${i}`, fx=KOFIX[id]||{}, w=BRACKET.advance[id];
+    if(w && w!==fx.home && w!==fx.away) delete BRACKET.advance[id];
+  }
+  // R16/QF/SF/F: each must match the teams that (now) feed it
+  for(let ri=1; ri<KO_ROUNDS.length; ri++){
+    const r=KO_ROUNDS[ri];
+    for(let i=0;i<r.n;i++){
+      const id=`${r.key}-${i}`, pair=bracketPairFor(r.key,i), w=BRACKET.advance[id];
+      if(w && w!==pair[0] && w!==pair[1]) delete BRACKET.advance[id];
+    }
+  }
+  const finals=bracketPairFor("F",0);
+  if(BRACKET.champ && BRACKET.champ!==finals[0] && BRACKET.champ!==finals[1]) BRACKET.champ="";
 }
 function pruneBracket(){
   for(let ri=1; ri<KO_ROUNDS.length; ri++){
