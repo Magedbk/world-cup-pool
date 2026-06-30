@@ -521,24 +521,26 @@ function baseTier(pred,res){
   if((pred.h-pred.a)===(res.h-res.a))return 3;
   return 2;
 }
-/* knockout score. pred={h,a,pens,adv}, res={h,a,pens,advTeam}, roundKey */
+/* knockout score. pred={h,a,pens,adv}, res={h,a,pens,advTeam}, roundKey
+   Model: scoreline = baseTier × round multiplier (unchanged).
+   PLUS a flat, un-multiplied shootout bonus when the match actually went to
+   penalties and the player predicted a draw + ticked pens + named the correct
+   surviving team — independent of whether their exact draw score was right. */
+const PEN_FLAT_BONUS = 3;
 function koScore(pred,res,roundKey){
   if(!pred||!res)return null;
   if(res.h==null||res.a==null)return null;
   const mult=KO_BY_KEY[roundKey].mult;
   const tier=baseTier(pred,res);
-  let base=tier, bonus=0;
-  const isDrawRes = res.h===res.a;
-  if(isDrawRes && res.pens){
-    const exactDraw = pred.h===res.h && pred.a===res.a;
+  let pts=Math.round(tier*mult);
+  // flat shootout bonus (not multiplied)
+  if(res.h===res.a && res.pens){            // actual match was a draw decided on pens
+    const predictedDraw = pred.h===pred.a;
     const predictedPens = !!pred.pens;
     const advCorrect = pred.adv && res.advTeam && pred.adv===res.advTeam;
-    if(exactDraw && predictedPens && advCorrect){ base=5; bonus=3; }
-    else if(exactDraw && predictedPens){ base=5; bonus=0; }
-    else if(tier>=2 && predictedPens){ base=2; bonus=0; }
-    else { base=tier; bonus=0; }
+    if(predictedDraw && predictedPens && advCorrect) pts += PEN_FLAT_BONUS;
   }
-  return Math.round((base+bonus)*mult);
+  return pts;
 }
 function koPtsClass(p){
   if(p==null)return "";
@@ -1649,7 +1651,7 @@ function rulesHTML(){
       </tbody>
     </table>
     <h3 style="font-size:15px;font-weight:700;margin:18px 0 6px">Penalties</h3>
-    <p style="color:var(--muted);font-size:13.5px;line-height:1.6">If your predicted match is a draw, tick <b>goes to penalties</b> and choose who advances. Getting all of it right — exact draw score, the penalty call, and the correct team through — scores the exact tier <b>plus a 3-point bonus</b>, then the round multiplier. Example: a perfectly-called semi-final shootout = (5 + 3) × 4 = <b>32</b>.</p>
+    <p style="color:var(--muted);font-size:13.5px;line-height:1.6">If you predict a draw, tick <b>goes to penalties</b> and choose who advances. Your scoreline is scored as usual (tier × round multiplier). On top, if the match really goes to penalties and you correctly predicted a draw, ticked penalties, and named the surviving team, you earn a flat <b>+3 bonus</b> — the same in every round and <b>not</b> multiplied. This rewards calling the shootout winner on its own, separately from the scoreline. Example: in a semi-final, predicting the wrong draw score (2–2 for an actual 1–1) but the right survivor scores (2 × 4) + 3 = <b>11</b>; nailing the exact draw and the survivor scores (5 × 4) + 3 = <b>23</b>.</p>
   </div>
   <div class="card pad">
     <h2 style="font-size:18px;font-weight:700;margin-bottom:6px">Bracket bonus</h2>
